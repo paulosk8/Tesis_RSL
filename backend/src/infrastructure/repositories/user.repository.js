@@ -44,12 +44,12 @@ class UserRepository {
 
     const query = hasPassword
       ? `
-          INSERT INTO users (email, full_name, role, avatar_url, google_id, password_hash)
+          INSERT INTO users (email, name, role, avatar_url, google_id, password_hash)
           VALUES ($1, $2, $3, $4, $5, $6)
           RETURNING *
         `
       : `
-          INSERT INTO users (email, full_name, role, avatar_url, google_id)
+          INSERT INTO users (email, name, role, avatar_url, google_id)
           VALUES ($1, $2, $3, $4, $5)
           RETURNING *
         `;
@@ -72,7 +72,7 @@ class UserRepository {
 
     // Construir dinámicamente la query según los campos proporcionados
     if (userData.fullName !== undefined) {
-      updates.push(`full_name = $${paramCount++}`);
+      updates.push(`name = $${paramCount++}`);
       values.push(userData.fullName);
     }
     if (userData.avatarUrl !== undefined) {

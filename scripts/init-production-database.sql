@@ -90,7 +90,6 @@ CREATE TABLE IF NOT EXISTS protocols (
   refined_question TEXT,
   key_terms JSONB DEFAULT '{}'::jsonb,
   temporal_range JSONB DEFAULT '{}'::jsonb,
-  temporal_range JSONB DEFAULT '{}'::jsonb,
   -- prisma_compliance REMOVED (now in prisma_items table)
   area VARCHAR(200),
   
@@ -115,7 +114,7 @@ CREATE INDEX IF NOT EXISTS idx_protocols_project ON protocols(project_id);
 -- =====================================================
 -- 5. TABLA REFERENCES
 -- =====================================================
-CREATE TABLE IF NOT EXISTS references (
+CREATE TABLE IF NOT EXISTS "references" (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
   
@@ -149,7 +148,7 @@ CREATE TABLE IF NOT EXISTS references (
   full_text_data JSONB,
   
   is_duplicate BOOLEAN DEFAULT FALSE,
-  duplicate_of UUID REFERENCES references(id) ON DELETE SET NULL,
+  duplicate_of UUID REFERENCES "references"(id) ON DELETE SET NULL,
   
   manual_review_status VARCHAR(50),
   manual_review_notes TEXT,
@@ -161,14 +160,14 @@ CREATE TABLE IF NOT EXISTS references (
   reviewer_id UUID REFERENCES users(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_references_project ON references(project_id);
-CREATE INDEX IF NOT EXISTS idx_references_status ON references(status);
-CREATE INDEX IF NOT EXISTS idx_references_screening_status ON references(screening_status);
-CREATE INDEX IF NOT EXISTS idx_references_year ON references(year);
-CREATE INDEX IF NOT EXISTS idx_references_doi ON references(doi);
-CREATE INDEX IF NOT EXISTS idx_references_priority ON references(priority_level);
-CREATE INDEX IF NOT EXISTS idx_references_phase ON references(phase);
-CREATE INDEX IF NOT EXISTS idx_references_duplicate ON references(is_duplicate);
+CREATE INDEX IF NOT EXISTS idx_references_project ON "references"(project_id);
+CREATE INDEX IF NOT EXISTS idx_references_status ON "references"(status);
+CREATE INDEX IF NOT EXISTS idx_references_screening_status ON "references"(screening_status);
+CREATE INDEX IF NOT EXISTS idx_references_year ON "references"(year);
+CREATE INDEX IF NOT EXISTS idx_references_doi ON "references"(doi);
+CREATE INDEX IF NOT EXISTS idx_references_priority ON "references"(priority_level);
+CREATE INDEX IF NOT EXISTS idx_references_phase ON "references"(phase);
+CREATE INDEX IF NOT EXISTS idx_references_duplicate ON "references"(is_duplicate);
 
 -- =====================================================
 -- 6. TABLA PRISMA_ITEMS
@@ -201,7 +200,7 @@ CREATE INDEX IF NOT EXISTS idx_prisma_items_completed ON prisma_items(completed)
 CREATE TABLE IF NOT EXISTS rqs_entries (
   id SERIAL PRIMARY KEY,
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  reference_id UUID NOT NULL REFERENCES references(id) ON DELETE CASCADE,
+  reference_id UUID NOT NULL REFERENCES "references"(id) ON DELETE CASCADE,
   
   author VARCHAR(500) NOT NULL,
   year INTEGER NOT NULL,
@@ -325,7 +324,7 @@ CREATE INDEX IF NOT EXISTS idx_api_usage_created_at ON api_usage(created_at DESC
 CREATE TABLE IF NOT EXISTS screening_records (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   project_id UUID NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
-  reference_id UUID NOT NULL REFERENCES references(id) ON DELETE CASCADE,
+  reference_id UUID NOT NULL REFERENCES "references"(id) ON DELETE CASCADE,
   reviewer_id UUID REFERENCES users(id) ON DELETE SET NULL,
   
   decision VARCHAR(50) NOT NULL,
@@ -383,9 +382,9 @@ CREATE TRIGGER update_protocols_updated_at
   BEFORE UPDATE ON protocols 
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
-DROP TRIGGER IF EXISTS update_references_updated_at ON references;
+DROP TRIGGER IF EXISTS update_references_updated_at ON "references";
 CREATE TRIGGER update_references_updated_at 
-  BEFORE UPDATE ON references 
+  BEFORE UPDATE ON "references" 
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
 DROP TRIGGER IF EXISTS update_prisma_items_updated_at ON prisma_items;

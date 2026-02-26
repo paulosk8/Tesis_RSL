@@ -1,10 +1,9 @@
-const OpenAI = require('openai');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 const ApiUsageRepository = require('../repositories/api-usage.repository');
 
 /**
  * Servicio centralizado para interacción con APIs de IA
- * Soporta OpenAI (ChatGPT) y Google Gemini con fallback automático
+ * Utiliza exclusivamente Google Gemini 2.5 Pro
  * INCLUYE REGISTRO AUTOMÁTICO DE USO
  */
 class AIService {
@@ -12,150 +11,59 @@ class AIService {
     this.userId = userId;
     this.apiUsageRepository = new ApiUsageRepository();
     
-    // Inicializar OpenAI/ChatGPT (PRIORIDAD 1)
-    if (process.env.OPENAI_API_KEY) {
-      this.openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY
-      });
-    }
-    
-    // Inicializar Gemini (PRIORIDAD 2)
+    // Inicializar Gemini
     if (process.env.GEMINI_API_KEY) {
       this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     }
 
-    if (!this.openai && !this.gemini) {
-      console.warn('⚠️ No hay APIs de IA configuradas');
+    if (!this.gemini) {
+      console.warn('⚠️ No hay API de Gemini configurada');
     }
   }
 
   /**
-   * Genera texto usando el proveedor disponible
+   * Genera texto usando Gemini
    * Compatible con 2 modos:
    * - generateText(fullPromptWithContext) - Un solo string con todo
-   * - generateText(systemInstructions, userContent, provider) - Separado
+   * - generateText(systemInstructions, userContent) - Separado
    * 
    * @param {string} promptOrSystem - Prompt completo o instrucción del sistema
-   * @param {string} contentOrProvider - Contenido del usuario o provider ('chatgpt'/'gemini')
-   * @param {string} providerOverride - Provider explícito (opcional)
+   * @param {string} contentOrProvider - Contenido del usuario o provider (ignorado ahora)
+   * @param {string} providerOverride - Provider explícito (ignorado)
    * @returns {Promise<string>} Texto generado
    */
   async generateText(promptOrSystem, contentOrProvider = null, providerOverride = null) {
-    let systemPrompt, userPrompt, provider;
+    let systemPrompt, userPrompt;
     
     // Detectar modo de uso
     if (contentOrProvider === null || contentOrProvider === undefined) {
       // Modo 1: generateText(fullPrompt)
       systemPrompt = "Eres un asistente experto en análisis académico.";
       userPrompt = promptOrSystem;
-      provider = providerOverride;
     } else if (['chatgpt', 'gemini'].includes(contentOrProvider)) {
-      // Modo 2: generateText(fullPrompt, 'chatgpt')
+      // Modo 2: fallback compatibility
       systemPrompt = "Eres un asistente experto en análisis académico.";
       userPrompt = promptOrSystem;
-      provider = contentOrProvider;
     } else {
-      // Modo 3: generateText(systemPrompt, userContent, provider)
+      // Modo 3: generateText(systemPrompt, userContent)
       systemPrompt = promptOrSystem;
       userPrompt = contentOrProvider;
-      provider = providerOverride;
-    }
-    // Determinar proveedor
-    let useProvider = provider;
-    
-    if (!useProvider) {
-      // Auto-selección: preferir ChatGPT si está disponible
-      if (this.openai) {
-        useProvider = 'chatgpt';
-      } else if (this.gemini) {
-        useProvider = 'gemini';
-      } else {
-        throw new Error('No hay proveedores de IA configurados');
-      }
     }
 
     try {
-      if (useProvider === 'chatgpt' && this.openai) {
-        return await this._generateWithChatGPT(systemPrompt, userPrompt);
-      } else if (useProvider === 'gemini' && this.gemini) {
-        return await this._generateWithGemini(systemPrompt, userPrompt);
-      } else if (this.openai) {
-        // Fallback a ChatGPT
-        console.log('🔄 Fallback a ChatGPT...');
-        return await this._generateWithChatGPT(systemPrompt, userPrompt);
-      } else if (this.gemini) {
-        // Fallback a Gemini
-        console.log('🔄 Fallback a Gemini...');
+      if (this.gemini) {
         return await this._generateWithGemini(systemPrompt, userPrompt);
       } else {
         throw new Error('No hay proveedores de IA configurados');
       }
     } catch (error) {
-      console.error(`❌ Error con ${useProvider}:`, error.message);
-      
-      // Intentar fallback al otro proveedor
-      if (useProvider === 'chatgpt' && this.gemini) {
-        console.log('🔄 Intentando fallback a Gemini...');
-        return await this._generateWithGemini(systemPrompt, userPrompt);
-      } else if (useProvider === 'gemini' && this.openai) {
-        console.log('🔄 Intentando fallback a ChatGPT...');
-        return await this._generateWithChatGPT(systemPrompt, userPrompt);
-      }
-      
+      console.error(`❌ Error con Gemini:`, error.message);
       throw error;
     }
   }
 
   /**
-   * Genera texto con ChatGPT
-   * @private
-   */
-  async _generateWithChatGPT(systemPrompt, userPrompt) {
-    if (!this.openai) {
-      throw new Error('OpenAI API key no configurada');
-    }
-
-    const startTime = Date.now();
-    let success = false;
-    let errorMessage = null;
-    let tokensUsed = 0;
-
-    try {
-      const completion = await this.openai.chat.completions.create({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: systemPrompt
-          },
-          {
-            role: "user",
-            content: userPrompt
-          }
-        ],
-        temperature: 0.3,
-        max_tokens: 2500
-      });
-
-      tokensUsed = completion.usage?.total_tokens || 0;
-      success = true;
-
-      // Registrar uso exitoso
-      await this._trackUsage('chatgpt', 'chat.completions', 'gpt-4o-mini', tokensUsed, true, null);
-
-      return completion.choices[0].message.content;
-    } catch (error) {
-      errorMessage = error.message;
-      
-      // Registrar uso fallido
-      await this._trackUsage('chatgpt', 'chat.completions', 'gpt-4o-mini', 0, false, errorMessage);
-      
-      throw error;
-    }
-  }
-
-  /**
-   * Genera texto con Gemini
+   * Genera texto con Gemini 2.5 Pro
    * @private
    */
   async _generateWithGemini(systemPrompt, userPrompt) {
@@ -163,43 +71,55 @@ class AIService {
       throw new Error('Gemini API key no configurada');
     }
 
-    const model = this.gemini.getGenerativeModel({ 
-      model: "gemini-2.0-flash",
-      systemInstruction: systemPrompt,
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 2500
-      }
-    });
+    let success = false;
+    let errorMessage = null;
+    let tokensUsed = 0;
 
-    const result = await model.generateContent(userPrompt);
-    const response = await result.response;
-    return response.text();
+    try {
+      const model = this.gemini.getGenerativeModel({ 
+        model: "gemini-2.5-pro",
+        systemInstruction: systemPrompt,
+        generationConfig: {
+          temperature: 0.3,
+          maxOutputTokens: 2500
+        }
+      });
+
+      const result = await model.generateContent(userPrompt);
+      const response = await result.response;
+      
+      tokensUsed = response.usageMetadata?.totalTokenCount || 0;
+      success = true;
+
+      await this._trackUsage('gemini', 'generateContent', 'gemini-2.5-pro', tokensUsed, true, null);
+
+      return response.text();
+    } catch (error) {
+      errorMessage = error.message;
+      await this._trackUsage('gemini', 'generateContent', 'gemini-2.5-pro', 0, false, errorMessage);
+      throw error;
+    }
   }
 
   /**
-   * Genera embeddings (solo disponible con OpenAI)
+   * Genera embeddings usando Gemini text-embedding-004
    * @param {string} text - Texto para generar embedding
    * @returns {Promise<number[]>} Vector de embedding
    */
   async generateEmbedding(text) {
-    if (!this.openai) {
-      throw new Error('OpenAI API key requerida para embeddings');
+    if (!this.gemini) {
+      throw new Error('Gemini API key requerida para embeddings');
     }
 
     try {
-      const response = await this.openai.embeddings.create({
-        model: "text-embedding-3-small",
-        input: text,
-      });
+      const model = this.gemini.getGenerativeModel({ model: "text-embedding-004"});
+      const result = await model.embedContent(text);
 
-      // Registrar uso de embeddings
-      await this._trackUsage('embeddings', 'embeddings.create', 'text-embedding-3-small', 0, true, null);
+      await this._trackUsage('embeddings', 'embedContent', 'text-embedding-004', 0, true, null);
 
-      return response.data[0].embedding;
+      return result.embedding.values;
     } catch (error) {
-      // Registrar uso fallido
-      await this._trackUsage('embeddings', 'embeddings.create', 'text-embedding-3-small', 0, false, error.message);
+      await this._trackUsage('embeddings', 'embedContent', 'text-embedding-004', 0, false, error.message);
       throw error;
     }
   }
@@ -211,7 +131,6 @@ class AIService {
   async _trackUsage(provider, endpoint, model, tokensTotal, success, errorMessage) {
     try {
       if (!this.userId) {
-        // Si no hay userId, no registramos (para casos donde se llama sin contexto de usuario)
         return;
       }
 
@@ -228,7 +147,6 @@ class AIService {
       });
     } catch (error) {
       console.error('⚠️ Error registrando uso de API:', error.message);
-      // No lanzar error para no interrumpir el flujo principal
     }
   }
 
@@ -238,9 +156,9 @@ class AIService {
    */
   getAvailability() {
     return {
-      chatgpt: !!this.openai,
+      chatgpt: false,
       gemini: !!this.gemini,
-      any: !!(this.openai || this.gemini)
+      any: !!this.gemini
     };
   }
 }

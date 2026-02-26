@@ -1,5 +1,3 @@
-const { pipeline } = require('@xenova/transformers');
-
 /**
  * Use Case: Cribado de Referencias con Embeddings Semánticos
  * 
@@ -10,6 +8,7 @@ class ScreenReferencesWithEmbeddingsUseCase {
   constructor() {
     this.model = null;
     this.modelName = 'Xenova/all-MiniLM-L6-v2';
+    this.pipeline = null;
   }
 
   /**
@@ -21,7 +20,11 @@ class ScreenReferencesWithEmbeddingsUseCase {
       console.log(`   (Esto puede tardar 30-60 segundos la primera vez)`);
       const loadStartTime = Date.now();
       try {
-        this.model = await pipeline('feature-extraction', this.modelName);
+        if (!this.pipeline) {
+          const transformers = await import('@xenova/transformers');
+          this.pipeline = transformers.pipeline;
+        }
+        this.model = await this.pipeline('feature-extraction', this.modelName);
         const loadDuration = ((Date.now() - loadStartTime) / 1000).toFixed(1);
         console.log(`✅ Modelo de embeddings cargado correctamente en ${loadDuration}s\n`);
       } catch (error) {

@@ -1,4 +1,4 @@
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 /**
  * Use Case: Generador de Términos del Protocolo
@@ -8,8 +8,8 @@ const OpenAI = require('openai');
  */
 class GenerateProtocolTermsUseCase {
   constructor() {
-    if (process.env.OPENAI_API_KEY) {
-      this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    if (process.env.GEMINI_API_KEY) {
+      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     }
   }
 
@@ -41,8 +41,8 @@ class GenerateProtocolTermsUseCase {
         customFocus
       });
       
-      if (!this.openai) {
-        throw new Error('OpenAI no está configurado');
+      if (!this.gemini) {
+        throw new Error('Gemini no está configurado');
       }
       
       let terms = null;
@@ -51,14 +51,15 @@ class GenerateProtocolTermsUseCase {
 
       while (!terms && retryCount < maxRetries) {
         try {
-          const completion = await this.openai.chat.completions.create({
-            model: 'gpt-4o-mini',
-            messages: [{ role: 'user', content: prompt }],
-            temperature: 0.4, // Equilibrio entre creatividad y consistencia
-            max_tokens: 800
+          const model = this.gemini.getGenerativeModel({
+            model: "gemini-2.5-pro",
+            generationConfig: {
+              temperature: 0.4,
+              maxOutputTokens: 800
+            }
           });
-          
-          const text = completion.choices[0].message.content;
+          const result = await model.generateContent(prompt);
+          const text = result.response.text();
           console.log('Respuesta raw (primeros 300 chars):', text.substring(0, 300));
 
           // Parsear la respuesta

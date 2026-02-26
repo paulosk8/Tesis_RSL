@@ -1,11 +1,11 @@
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const Ajv = require('ajv');
 const ajv = new Ajv({ allErrors: true, strict: false });
 
 class GenerateProtocolAnalysisUseCase {
-  constructor({ openaiApiKey = process.env.OPENAI_API_KEY } = {}) {
-    if (openaiApiKey) {
-      this.openai = new OpenAI({ apiKey: openaiApiKey });
+  constructor({ geminiApiKey = process.env.GEMINI_API_KEY } = {}) {
+    if (geminiApiKey) {
+      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     }
     this.outputSchema = {
       type: 'object',
@@ -586,19 +586,19 @@ RESPONDE ÚNICAMENTE CON EL JSON VÁLIDO. NO AGREGUES TEXTO ADICIONAL.
   }
 
   async generateWithChatGPT(prompt) {
-    if (!this.openai) throw new Error('OpenAI no configurado');
+    if (!this.gemini) throw new Error('OpenAI no configurado');
     const res = await this.retry(async () => {
-      const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4o-mini',
-        messages: [
-          { role: 'system', content: 'Eres un experto en metodología PRISMA 2020/Cochrane para revisiones sistemáticas en Ingeniería y Tecnología. REGLAS CRÍTICAS ABSOLUTAS: (1) La POBLACIÓN en RSL de ingeniería es el SISTEMA/ENTORNO TÉCNICO donde se aplica la tecnología, NUNCA "artículos", "estudios" o "publicaciones". (2) Si PICO-C existe, el TÍTULO DEBE incluirlo con formato "I vs C: Impact on O". (3) Usa TÉRMINOS PARAGUAS en títulos (Performance, Efficiency), no métricas individuales. Respondes solo con JSON válido.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.6, // Aumentado de 0.3 a 0.6 para mayor especificidad
-        max_tokens: 5000, // Aumentado para prompt más largo
-        response_format: { type: 'json_object' }
+      const model = this.gemini.getGenerativeModel({
+        model: "gemini-2.5-pro",
+        systemInstruction: 'Eres un experto en metodología PRISMA 2020/Cochrane para revisiones sistemáticas en Ingeniería y Tecnología. REGLAS CRÍTICAS ABSOLUTAS: (1) La POBLACIÓN en RSL de ingeniería es el SISTEMA/ENTORNO TÉCNICO donde se aplica la tecnología, NUNCA "artículos", "estudios" o "publicaciones". (2) Si PICO-C existe, el TÍTULO DEBE incluirlo con formato "I vs C: Impact on O". (3) Usa TÉRMINOS PARAGUAS en títulos (Performance, Efficiency), no métricas individuales. Respondes solo con JSON válido.',
+        generationConfig: {
+          temperature: 0.6,
+          maxOutputTokens: 5000,
+          responseMimeType: "application/json"
+        }
       });
-      return completion.choices?.[0]?.message?.content || '';
+      const result = await model.generateContent(prompt);
+      return result.response.text() || '';
     }, 3, 500);
     return this.normalizeText(res);
   }
@@ -657,7 +657,7 @@ RESPONDE ÚNICAMENTE CON EL JSON VÁLIDO. NO AGREGUES TEXTO ADICIONAL.
    */
   async updateMatrizEsNoEs({ marcoPico, area = 'No especificada', yearStart = 2019, yearEnd = new Date().getFullYear() } = {}) {
     if (!marcoPico) throw new Error('Marco PICO requerido para actualizar matriz');
-    if (!this.openai) throw new Error('No hay proveedor de IA configurado (OpenAI)');
+    if (!this.gemini) throw new Error('No hay proveedor de IA configurado (OpenAI)');
     
     console.log('🔄 Actualizando matriz ES/NO ES basada en cambios PICO...');
     console.log('   Área:', area);
@@ -702,7 +702,7 @@ RESPONDE ÚNICAMENTE CON EL JSON VÁLIDO. NO AGREGUES TEXTO ADICIONAL.
    */
   async execute({ title, description, area, yearStart, yearEnd, aiProvider = 'chatgpt' } = {}) {
     if (!title || !description) throw new Error('Titulo y descripcion requeridos');
-    if (!this.openai) throw new Error('No hay proveedor de IA configurado (OpenAI)');
+    if (!this.gemini) throw new Error('No hay proveedor de IA configurado (OpenAI)');
     
     console.log('🔬 Generando análisis de protocolo...');
     console.log('   Proveedor:', aiProvider);

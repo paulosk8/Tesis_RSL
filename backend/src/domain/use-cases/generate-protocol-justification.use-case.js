@@ -1,4 +1,4 @@
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 /**
  * Use Case: Genera la JUSTIFICACIÓN del protocolo de revisión sistemática
@@ -12,10 +12,10 @@ const OpenAI = require('openai');
  */
 class GenerateProtocolJustificationUseCase {
   constructor({ 
-    openaiApiKey = process.env.OPENAI_API_KEY
+    geminiApiKey = process.env.GEMINI_API_KEY
   } = {}) {
-    if (openaiApiKey) {
-      this.openai = new OpenAI({ apiKey: openaiApiKey });
+    if (geminiApiKey) {
+      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     }
   }
 
@@ -28,8 +28,8 @@ class GenerateProtocolJustificationUseCase {
     console.log(`   Área: ${area}`);
     console.log(`   Rango temporal: ${yearStart} - ${yearEnd}`);
 
-    if (!this.openai) {
-      throw new Error('OpenAI no está configurado');
+    if (!this.gemini) {
+      throw new Error('Gemini no está configurado');
     }
 
     try {
@@ -48,24 +48,18 @@ class GenerateProtocolJustificationUseCase {
   async _generateWithChatGPT({ title, description, area, yearStart, yearEnd, pico, matrixData }) {
     const prompt = this._buildPrompt({ title, description, area, yearStart, yearEnd, pico, matrixData });
 
-    const completion = await this.openai.chat.completions.create({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'Eres un experto en metodología PRISMA/Cochrane especializado en redacción de justificaciones académicas para protocolos de revisión sistemática.'
-        },
-        {
-          role: 'user',
-          content: prompt
-        }
-      ],
-      temperature: 0.6, // Balance entre creatividad y rigor
-      max_tokens: 2000,
-      response_format: { type: "json_object" }
+    const model = this.gemini.getGenerativeModel({
+      model: "gemini-2.5-pro",
+      systemInstruction: 'Eres un experto en metodología PRISMA/Cochrane especializado en redacción de justificaciones académicas para protocolos de revisión sistemática.',
+      generationConfig: {
+        temperature: 0.6,
+        maxOutputTokens: 2000,
+        responseMimeType: "application/json"
+      }
     });
 
-    const text = completion.choices[0].message.content.trim();
+    const result = await model.generateContent(prompt);
+    const text = result.response.text().trim();
     return JSON.parse(text);
   }
 

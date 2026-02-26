@@ -1,4 +1,4 @@
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 const {
   sanitizeTerm,
   validateIEEE,
@@ -18,10 +18,8 @@ const {
 class SearchQueryGenerator {
   constructor() {
     // Inicializar OpenAI/ChatGPT
-    if (process.env.OPENAI_API_KEY) {
-      this.openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY
-      });
+    if (process.env.GEMINI_API_KEY) {
+      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     }
   }
 
@@ -37,13 +35,13 @@ class SearchQueryGenerator {
       const prompt = this.buildPrompt({ databases, picoData, protocolTerms, researchArea, matrixData, yearStart, yearEnd, selectedTitle });
       
       let text;
-      if (this.openai) {
-        const completion = await this.openai.chat.completions.create({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.7
+      if (this.gemini) {
+        const model = this.gemini.getGenerativeModel({
+          model: 'gemini-2.5-pro',
+          generationConfig: { temperature: 0.7 }
         });
-        text = completion.choices[0].message.content;
+        const result = await model.generateContent(prompt);
+        text = result.response.text();
       } else {
         throw new Error('No hay proveedor de IA configurado (OpenAI API Key requerida)');
       }

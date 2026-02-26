@@ -1,12 +1,10 @@
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 class GenerateTitlesUseCase {
   constructor() {
     // Inicializar OpenAI/ChatGPT
-    if (process.env.OPENAI_API_KEY) {
-      this.openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY
-      });
+    if (process.env.GEMINI_API_KEY) {
+      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     }
   }
 
@@ -22,7 +20,7 @@ class GenerateTitlesUseCase {
     try {
       console.log('Generando 5 títulos con validación Cochrane...');
       
-      if (!this.openai) {
+      if (!this.gemini) {
         throw new Error('No hay proveedor de IA configurado');
       }
       
@@ -66,28 +64,22 @@ class GenerateTitlesUseCase {
    * Genera títulos usando ChatGPT
    */
   async _generateWithChatGPT(prompt) {
-    if (!this.openai) {
-      throw new Error('OpenAI API key no configurada');
+    if (!this.gemini) {
+      throw new Error('Gemini API key no configurada');
     }
 
-    const completion = await this.openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "Eres un Editor en Jefe de un Journal de Ingeniería de alto impacto (Q1). Tu estándar de calidad es extremo. Generas títulos académicos con rigor metodológico PRISMA 2020. Respondes ÚNICAMENTE en formato JSON válido."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.6, // Aumentado a 0.6 para evitar que los 5 títulos suenen idénticos
-      max_tokens: 3000,
-      response_format: { type: "json_object" }
+    const model = this.gemini.getGenerativeModel({
+      model: "gemini-2.5-pro",
+      systemInstruction: "Eres un Editor en Jefe de un Journal de Ingeniería de alto impacto (Q1). Tu estándar de calidad es extremo. Generas títulos académicos con rigor metodológico PRISMA 2020. Respondes ÚNICAMENTE en formato JSON válido.",
+      generationConfig: {
+        temperature: 0.6,
+        maxOutputTokens: 3000,
+        responseMimeType: "application/json"
+      }
     });
 
-    const content = completion.choices[0].message.content;
+    const result = await model.generateContent(prompt);
+    const content = result.response.text();
     return JSON.parse(content);
   }
 

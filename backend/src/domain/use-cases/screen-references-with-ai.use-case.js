@@ -1,4 +1,4 @@
-const OpenAI = require('openai');
+const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 /**
  * Caso de uso: Cribado automático de referencias con IA
@@ -7,10 +7,8 @@ const OpenAI = require('openai');
 class ScreenReferencesWithAIUseCase {
   constructor() {
     // Inicializar OpenAI/ChatGPT
-    if (process.env.OPENAI_API_KEY) {
-      this.openai = new OpenAI({
-        apiKey: process.env.OPENAI_API_KEY
-      });
+    if (process.env.GEMINI_API_KEY) {
+      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     }
   }
 
@@ -31,8 +29,8 @@ class ScreenReferencesWithAIUseCase {
     const prompt = this.buildPrompt(reference, inclusionCriteria, exclusionCriteria, researchQuestion);
 
     try {
-      if (!this.openai) {
-        throw new Error('OpenAI API key no configurada');
+      if (!this.gemini) {
+        throw new Error('Gemini API key no configurada');
       }
 
       const result = await this.generateWithChatGPT(prompt);
@@ -177,24 +175,18 @@ Responde SOLO con JSON válido.`;
   }
 
   async generateWithChatGPT(prompt) {
-    const completion = await this.openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        {
-          role: "system",
-          content: "Eres un experto en revisión sistemática de literatura científica. Analizas referencias con rigor metodológico siguiendo PRISMA. Respondes en formato JSON válido."
-        },
-        {
-          role: "user",
-          content: prompt
-        }
-      ],
-      temperature: 0.3, // Baja temperatura para mayor consistencia
-      max_tokens: 2000,
-      response_format: { type: "json_object" }
+    const model = this.gemini.getGenerativeModel({
+      model: "gemini-2.5-pro",
+      systemInstruction: "Eres un experto en revisión sistemática de literatura científica. Analizas referencias con rigor metodológico siguiendo PRISMA. Respondes en formato JSON válido.",
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 2000,
+        responseMimeType: "application/json"
+      }
     });
 
-    return JSON.parse(completion.choices[0].message.content);
+    const result = await model.generateContent(prompt);
+    return JSON.parse(result.response.text());
   }
 }
 
