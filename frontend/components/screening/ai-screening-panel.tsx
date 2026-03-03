@@ -68,10 +68,10 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
       setCurrentPhase('Iniciando cribado automático...');
       setProgress(10);
       // Construir URL del endpoint SSE con token
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const token = localStorage.getItem('token');
       const eventSourceUrl = `${baseUrl}/api/ai/run-project-screening-stream?projectId=${projectId}&threshold=${threshold[0]}&aiProvider=${method === 'llm' ? 'gemini' : 'chatgpt'}&token=${token}`;
-      
+
       // Crear EventSource para SSE
       const eventSource = new EventSource(eventSourceUrl);
 
@@ -106,14 +106,14 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
               setProgress(100);
               setCurrentPhase('✅ Cribado completado exitosamente');
               eventSource.close();
-              
+
               // Notificar al padre que recargue los datos y actualice el estado
               setTimeout(() => {
                 setIsRunning(false);
                 setProgress(0);
                 setCurrentPhase('');
                 setProcessedCount(0);
-                
+
                 // Llamar al callback del padre para que actualice todo
                 // Pasar también los datos del resultado para que se guarden correctamente
                 if (onScreeningComplete) {
@@ -171,7 +171,7 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
             Cribado Automático con IA
           </CardTitle>
           <CardDescription>
-            El sistema analiza automáticamente todas las referencias usando similitud semántica 
+            El sistema analiza automáticamente todas las referencias usando similitud semántica
             e inteligencia artificial para clasificarlas en categorías de relevancia según los criterios de tu protocolo.
           </CardDescription>
         </CardHeader>
@@ -191,9 +191,9 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
 
           {/* Botón de acción — SOLO se muestra si hay pendientes (no se permite re-ejecutar) */}
           {pendingReferences > 0 && (
-            <Button 
-              onClick={handleRunScreening} 
-              disabled={isRunning || totalReferences === 0 || method === 'llm'} 
+            <Button
+              onClick={handleRunScreening}
+              disabled={isRunning || totalReferences === 0 || method === 'llm'}
               className="w-full"
               size="lg"
             >
@@ -243,7 +243,7 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
       </Card>
 
       {/* Modal de Progreso */}
-      <Dialog open={isRunning} onOpenChange={() => {}}>
+      <Dialog open={isRunning} onOpenChange={() => { }}>
         <DialogContent className="sm:max-w-[600px]" onInteractOutside={(e) => e.preventDefault()}>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-xl">
@@ -254,7 +254,7 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
               Por favor espera mientras el sistema procesa todas las referencias con IA
             </DialogDescription>
           </DialogHeader>
-          
+
           <div className="space-y-6 py-4">
             {/* Barra de progreso principal */}
             <div className="space-y-3">
@@ -291,12 +291,10 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
             {/* Fases del proceso */}
             <div className="space-y-2">
               <div className="text-sm font-semibold text-foreground mb-2">Fases del Proceso:</div>
-              <div className={`flex items-start gap-3 p-3 rounded-lg border-2 ${ 
-                progress < 10 ? 'border-primary bg-primary/10' : 'border-muted bg-muted/30'
-              }`}>
-                <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                  progress < 10 ? 'bg-primary text-primary-foreground' : 'bg-green-500 text-white'
+              <div className={`flex items-start gap-3 p-3 rounded-lg border-2 ${progress < 10 ? 'border-primary bg-primary/10' : 'border-muted bg-muted/30'
                 }`}>
+                <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${progress < 10 ? 'bg-primary text-primary-foreground' : 'bg-green-500 text-white'
+                  }`}>
                   {progress < 10 ? <Loader2 className="h-4 w-4 animate-spin" /> : '✓'}
                 </div>
                 <div>
@@ -305,16 +303,14 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
                 </div>
               </div>
 
-              <div className={`flex items-start gap-3 p-3 rounded-lg border-2 ${
-                progress >= 10 && progress < 35 ? 'border-primary bg-primary/10' : 
-                progress >= 35 ? 'border-muted bg-muted/30' : 'border-muted/50'
-              }`}>
-                <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                  progress >= 10 && progress < 35 ? 'bg-primary text-primary-foreground' :
-                  progress >= 35 ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+              <div className={`flex items-start gap-3 p-3 rounded-lg border-2 ${progress >= 10 && progress < 35 ? 'border-primary bg-primary/10' :
+                  progress >= 35 ? 'border-muted bg-muted/30' : 'border-muted/50'
                 }`}>
-                  {progress >= 10 && progress < 35 ? <Loader2 className="h-4 w-4 animate-spin" /> : 
-                   progress >= 35 ? '✓' : '1'}
+                <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${progress >= 10 && progress < 35 ? 'bg-primary text-primary-foreground' :
+                    progress >= 35 ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+                  }`}>
+                  {progress >= 10 && progress < 35 ? <Loader2 className="h-4 w-4 animate-spin" /> :
+                    progress >= 35 ? '✓' : '1'}
                 </div>
                 <div>
                   <div className="text-sm font-medium">Fase 1: Clasificación con Embeddings</div>
@@ -324,16 +320,14 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
                 </div>
               </div>
 
-              <div className={`flex items-start gap-3 p-3 rounded-lg border-2 ${
-                progress >= 35 && progress < 95 ? 'border-primary bg-primary/10' :
-                progress >= 95 ? 'border-muted bg-muted/30' : 'border-muted/50'
-              }`}>
-                <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                  progress >= 35 && progress < 95 ? 'bg-primary text-primary-foreground' :
-                  progress >= 95 ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+              <div className={`flex items-start gap-3 p-3 rounded-lg border-2 ${progress >= 35 && progress < 95 ? 'border-primary bg-primary/10' :
+                  progress >= 95 ? 'border-muted bg-muted/30' : 'border-muted/50'
                 }`}>
+                <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${progress >= 35 && progress < 95 ? 'bg-primary text-primary-foreground' :
+                    progress >= 95 ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+                  }`}>
                   {progress >= 35 && progress < 95 ? <Loader2 className="h-4 w-4 animate-spin" /> :
-                   progress >= 95 ? '✓' : '2'}
+                    progress >= 95 ? '✓' : '2'}
                 </div>
                 <div>
                   <div className="text-sm font-medium">Fase 2: Análisis con ChatGPT</div>
@@ -349,15 +343,13 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
                 </div>
               </div>
 
-              <div className={`flex items-start gap-3 p-3 rounded-lg border-2 ${
-                progress >= 95 ? 'border-primary bg-primary/10' : 'border-muted/50'
-              }`}>
-                <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                  progress >= 95 && progress < 100 ? 'bg-primary text-primary-foreground' :
-                  progress === 100 ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+              <div className={`flex items-start gap-3 p-3 rounded-lg border-2 ${progress >= 95 ? 'border-primary bg-primary/10' : 'border-muted/50'
                 }`}>
+                <div className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${progress >= 95 && progress < 100 ? 'bg-primary text-primary-foreground' :
+                    progress === 100 ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+                  }`}>
                   {progress >= 95 && progress < 100 ? <Loader2 className="h-4 w-4 animate-spin" /> :
-                   progress === 100 ? '✓' : '3'}
+                    progress === 100 ? '✓' : '3'}
                 </div>
                 <div>
                   <div className="text-sm font-medium">Fase 3: Guardando Resultados</div>
@@ -371,8 +363,8 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
               <Alert className="border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20">
                 <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
                 <AlertDescription className="text-xs text-amber-900 dark:text-amber-100">
-                  ⏳ <strong>Proceso en curso:</strong> ChatGPT está analizando cada referencia del rango de incertidumbre. 
-                  Este proceso puede tardar varios minutos dependiendo de la cantidad de referencias. 
+                  ⏳ <strong>Proceso en curso:</strong> ChatGPT está analizando cada referencia del rango de incertidumbre.
+                  Este proceso puede tardar varios minutos dependiendo de la cantidad de referencias.
                   Por favor no cierres esta ventana.
                 </AlertDescription>
               </Alert>

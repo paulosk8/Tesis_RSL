@@ -22,13 +22,22 @@ class ScreenReferencesWithEmbeddingsUseCase {
       try {
         if (!this.pipeline) {
           const transformers = await import('@xenova/transformers');
+          // Configuración robusta para entornos Node.js
+          transformers.env.allowRemoteModels = true;
+          transformers.env.localModelPath = require('path').join(process.cwd(), '.cache', 'models');
+          transformers.env.cacheDir = require('path').join(process.cwd(), '.cache', 'models');
           this.pipeline = transformers.pipeline;
         }
-        this.model = await this.pipeline('feature-extraction', this.modelName);
+        
+        // Cargar modelo con opciones explícitas
+        this.model = await this.pipeline('feature-extraction', this.modelName, {
+          quantized: true, // Usa versión cuantizada más ligera
+        });
+        
         const loadDuration = ((Date.now() - loadStartTime) / 1000).toFixed(1);
         console.log(`✅ Modelo de embeddings cargado correctamente en ${loadDuration}s\n`);
       } catch (error) {
-        console.error('❌ Error cargando modelo de embeddings:', error);
+        console.error('❌ Error catastrófico cargando modelo de embeddings Xenova/ONNX:', error);
         throw new Error(`No se pudo cargar el modelo de embeddings: ${error.message}`);
       }
     }

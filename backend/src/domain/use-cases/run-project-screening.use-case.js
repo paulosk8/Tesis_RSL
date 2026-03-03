@@ -21,7 +21,12 @@ class RunProjectScreeningUseCase {
   calculatePercentile(sortedArray, percentile) {
     if (sortedArray.length === 0) return 0;
     
-    const index = (percentile / 100) * (sortedArray.length - 1);
+    // Ajuste: El array entra en orden DESCENDENTE (mayor a menor).
+    // Por tanto, el percentil 75 (top 25%) está en el índice 25%.
+    // Invertimos el percentil: p75 -> busca en el 25% inicial del array
+    const invertedPercentile = 100 - percentile;
+    const index = (invertedPercentile / 100) * (sortedArray.length - 1);
+    
     const lower = Math.floor(index);
     const upper = Math.ceil(index);
     const weight = index % 1;
@@ -30,6 +35,7 @@ class RunProjectScreeningUseCase {
       return sortedArray[lower];
     }
 
+    // Como está descendente, sortedArray[lower] > sortedArray[upper]
     return sortedArray[lower] * (1 - weight) + sortedArray[upper] * weight;
   }
 
@@ -251,14 +257,22 @@ class RunProjectScreeningUseCase {
       const p75 = this.calculatePercentile(similarities, 75); // Top 25% -> Alta confianza INCLUIR
       const p25 = this.calculatePercentile(similarities, 25); // Bottom 25% -> Alta confianza EXCLUIR
       
-      // Ajustar umbrales para que sean razonables
-      const upperThreshold = Math.max(p75, 0.25); // Mínimo 25% para incluir
-      const lowerThreshold = Math.min(p25, 0.15); // Máximo 15% para excluir automáticamente
+      // Ajustar umbrales para que sean más exigentes y dejen menos en la zona gris
+      // Cuando hay pocas referencias, la distribución puede ser estrecha
+      const mean = similarities.reduce((a, b) => a + b, 0) / similarities.length;
+      const stdDev = Math.sqrt(similarities.map(x => Math.pow(x - mean, 2)).reduce((a, b) => a + b, 0) / similarities.length);
+      
+      // Basado en z-scores adaptativos, pero manteniendo topes de seguridad sensatos
+      const dynamicUpper = mean + (stdDev * 0.5); // +0.5 std dev
+      const dynamicLower = mean - (stdDev * 0.5); // -0.5 std dev
+
+      const upperThreshold = Math.max(dynamicUpper, p75); // Priorizar el más exigente (mayor)
+      const lowerThreshold = Math.min(dynamicLower, p25); // Priorizar el más selectivo (menor)
 
       console.log(`[PHASE 1] Umbrales adaptativos calculados:`);
       console.log(`[PHASE 1]   Alta confianza INCLUIR: >= ${(upperThreshold * 100).toFixed(1)}%`);
       console.log(`[PHASE 1]   Alta confianza EXCLUIR: <= ${(lowerThreshold * 100).toFixed(1)}%`);
-      console.log(`[PHASE 1]   Zona gris: ${(lowerThreshold * 100).toFixed(1)}% - ${(upperThreshold * 100).toFixed(1)}%`);
+      console.log(`[PHASE 1]   Zona gris (LLM limit): ${(lowerThreshold * 100).toFixed(1)}% - ${(upperThreshold * 100).toFixed(1)}%`);
 
       // Clasificar por confianza con umbrales adaptativos
       const highConfidenceInclude = [];

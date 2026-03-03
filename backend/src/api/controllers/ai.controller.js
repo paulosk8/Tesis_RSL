@@ -650,103 +650,115 @@ const runProjectScreeningEmbeddings = async (req, res) => {
   }
 };
 
-/**
- * GET /api/ai/run-project-screening-stream
- * Ejecuta cribado HÍBRIDO con Server-Sent Events para progreso en tiempo real
- */
-const runProjectScreeningStream = async (req, res) => {
-  try {
-    const { projectId, threshold, aiProvider, token } = req.query;
+  // GET /api/ai/run-project-screening-stream
+  // Ejecuta cribado HÍBRIDO con Server-Sent Events para progreso en tiempo real
+  const runProjectScreeningStream = async (req, res) => {
+    try {
+      const { projectId, threshold, aiProvider, token } = req.query;
 
-    if (!projectId) {
-      return res.status(400).json({
-        success: false,
-        message: 'ID del proyecto es requerido'
-      });
-    }
-
-    // Si se proporciona token en query, validarlo manualmente
-    // (EventSource no soporta headers personalizados)
-    if (token) {
-      try {
-        const jwt = require('jsonwebtoken');
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
-        req.user = decoded; // Adjuntar usuario al request
-      } catch (tokenError) {
-        return res.status(401).json({
+      if (!projectId) {
+        return res.status(400).json({
           success: false,
-          message: 'Token inválido o expirado'
+          message: 'ID del proyecto es requerido'
+        });
+      }
+
+      // Si se proporciona token en query, validarlo manualmente
+      if (token) {
+        try {
+          const jwt = require('jsonwebtoken');
+          const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+          req.user = decoded; // Adjuntar usuario al request
+        } catch (tokenError) {
+          return res.status(401).json({
+            success: false,
+            message: 'Token inválido o expirado'
+          });
+        }
+      }
+
+      // Obtener protocolo del proyecto
+      const protocol = await protocolRepository.findByProjectId(projectId);
+      
+      if (!protocol) {
+        return res.status(404).json({
+          success: false,
+          message: 'Protocolo no encontrado. Crea un protocolo antes de ejecutar el cribado.'
+        });
+      }
+
+      // Configurar SSE
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        'Connection': 'keep-alive',
+        'X-Accel-Buffering': 'no' // Para Nginx
+      });
+
+      // Implementar Ping Keep-Alive para evitar Timeouts de Proxy
+      const keepAliveInterval = setInterval(() => {
+        res.write(': keepalive\n\n');
+      }, 15000);
+
+      const cleanup = () => {
+        clearInterval(keepAliveInterval);
+      };
+
+      req.on('close', () => {
+        cleanup();
+      });
+
+      // Helper para enviar eventos SSE
+      const sendEvent = (data) => {
+        res.write(`data: ${JSON.stringify(data)}\n\n`);
+      };
+
+      // Callback para recibir progreso del use case
+      const progressCallback = (event) => {
+        sendEvent(event);
+      };
+
+      console.log('🔬 Ejecutando cribado HÍBRIDO con SSE...');
+      console.log('   Proyecto:', projectId);
+      console.log('   Umbral embeddings:', threshold || 0.15);
+      console.log('   Proveedor IA:', aiProvider || 'chatgpt');
+
+      try {
+        const result = await runProjectScreeningUseCase.executeHybrid({
+          projectId,
+          protocol,
+          embeddingThreshold: parseFloat(threshold) || 0.15,
+          aiProvider: aiProvider || 'gemini', // Forzado Gemini defaults
+          progressCallback // Pasar callback para eventos de progreso
+        });
+
+        // Enviar resultado final
+        sendEvent({
+          type: 'complete',
+          data: result
+        });
+
+        cleanup();
+        res.end();
+      } catch (error) {
+        console.error('❌ Error en cribado híbrido con SSE:', error);
+        sendEvent({
+          type: 'error',
+          message: error.message || 'Error al ejecutar cribado híbrido'
+        });
+        cleanup();
+        res.end();
+      }
+    } catch (error) {
+      console.error('❌ Error configurando SSE:', error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: error.message || 'Error al configurar streaming'
         });
       }
     }
-
-    // Obtener protocolo del proyecto
-    const protocol = await protocolRepository.findByProjectId(projectId);
-    
-    if (!protocol) {
-      return res.status(404).json({
-        success: false,
-        message: 'Protocolo no encontrado. Crea un protocolo antes de ejecutar el cribado.'
-      });
-    }
-
-    // Configurar SSE
-    res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-      'X-Accel-Buffering': 'no' // Para Nginx
-    });
-
-    // Helper para enviar eventos SSE
-    const sendEvent = (data) => {
-      res.write(`data: ${JSON.stringify(data)}\n\n`);
-    };
-
-    // Callback para recibir progreso del use case
-    const progressCallback = (event) => {
-      sendEvent(event);
-    };
-
-    console.log('🔬 Ejecutando cribado HÍBRIDO con SSE...');
-    console.log('   Proyecto:', projectId);
-    console.log('   Umbral embeddings:', threshold || 0.15);
-    console.log('   Proveedor IA:', aiProvider || 'chatgpt');
-
-    try {
-      const result = await runProjectScreeningUseCase.executeHybrid({
-        projectId,
-        protocol,
-        embeddingThreshold: parseFloat(threshold) || 0.15,
-        aiProvider: aiProvider || 'chatgpt',
-        progressCallback // Pasar callback para eventos de progreso
-      });
-
-      // Enviar resultado final
-      sendEvent({
-        type: 'complete',
-        data: result
-      });
-
-      res.end();
-    } catch (error) {
-      console.error('❌ Error en cribado híbrido con SSE:', error);
-      sendEvent({
-        type: 'error',
-        message: error.message || 'Error al ejecutar cribado híbrido'
-      });
-      res.end();
-    }
-  } catch (error) {
-    console.error('❌ Error configurando SSE:', error);
-    if (!res.headersSent) {
-      res.status(500).json({
-        success: false,
-        message: error.message || 'Error al configurar streaming'
-      });
-    }
-  }
-};
+  };
 
 /**
  * POST /api/ai/run-project-screening-llm

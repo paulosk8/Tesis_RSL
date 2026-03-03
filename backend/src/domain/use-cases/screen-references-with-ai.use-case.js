@@ -180,13 +180,35 @@ Responde SOLO con JSON válido.`;
       systemInstruction: "Eres un experto en revisión sistemática de literatura científica. Analizas referencias con rigor metodológico siguiendo PRISMA. Respondes en formato JSON válido.",
       generationConfig: {
         temperature: 0.3,
-        maxOutputTokens: 2000,
+        maxOutputTokens: 8000,
         responseMimeType: "application/json"
       }
     });
 
     const result = await model.generateContent(prompt);
-    return JSON.parse(result.response.text());
+    let text = result.response.text().trim();
+    if (text.startsWith('```json')) text = text.replace(/^```json/i, '');
+    else if (text.startsWith('```')) text = text.replace(/^```/i, '');
+    if (text.endsWith('```')) text = text.replace(/```$/i, '');
+    text = text.trim();
+    
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      console.error("❌ Fallo parseando JSON de Gemini. Raw output:", text.substring(0, 200) + '...');
+      // Intentar auto-reparar o retornar JSON por defecto estructurado en vez de explotar
+      try {
+        // En caso excepcional si devuelve un string incompleto, devolver dummy
+        return {
+          decision: "revisar_manual",
+          confidence: 0,
+          razonamiento: "Error de IA recuperado automáticamente: " + e.message,
+          recomendacion_revision_manual: "si"
+        };
+      } catch(e2) {
+        throw e;
+      }
+    }
   }
 }
 

@@ -66,38 +66,51 @@ class AIService {
    * Genera texto con Gemini 2.5 Pro
    * @private
    */
-  async _generateWithGemini(systemPrompt, userPrompt) {
+  async _generateWithGemini(systemPrompt, userPrompt, maxRetries = 3) {
     if (!this.gemini) {
       throw new Error('Gemini API key no configurada');
     }
 
-    let success = false;
-    let errorMessage = null;
+    let lastError = null;
     let tokensUsed = 0;
 
-    try {
-      const model = this.gemini.getGenerativeModel({ 
-        model: "gemini-2.5-pro",
-        systemInstruction: systemPrompt,
-        generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 2500
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const model = this.gemini.getGenerativeModel({ 
+          model: "gemini-2.5-pro",
+          systemInstruction: systemPrompt,
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 8192
+          }
+        });
+
+        const result = await model.generateContent(userPrompt);
+        const response = await result.response;
+        
+        tokensUsed = response.usageMetadata?.totalTokenCount || 0;
+        await this._trackUsage('gemini', 'generateContent', 'gemini-2.5-pro', tokensUsed, true, null);
+
+        return response.text();
+      } catch (error) {
+        lastError = error;
+        const errorMessage = error.message.toLowerCase();
+        
+        // Check for rate limit or quota exceeded
+        if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('too many requests')) {
+          console.warn(`⏳ [Intento ${attempt}/${maxRetries}] Límite de cuota Gemini excedido. Esperando antes de reintentar...`);
+          if (attempt < maxRetries) {
+            // Exponential backoff: 23s, 46s
+            const waitTime = 23000 * attempt; 
+            await new Promise(resolve => setTimeout(resolve, waitTime));
+            continue;
+          }
         }
-      });
-
-      const result = await model.generateContent(userPrompt);
-      const response = await result.response;
-      
-      tokensUsed = response.usageMetadata?.totalTokenCount || 0;
-      success = true;
-
-      await this._trackUsage('gemini', 'generateContent', 'gemini-2.5-pro', tokensUsed, true, null);
-
-      return response.text();
-    } catch (error) {
-      errorMessage = error.message;
-      await this._trackUsage('gemini', 'generateContent', 'gemini-2.5-pro', 0, false, errorMessage);
-      throw error;
+        
+        // Track the failed usage if we've exhausted retries or it's a non-retryable error
+        await this._trackUsage('gemini', 'generateContent', 'gemini-2.5-pro', 0, false, error.message);
+        throw error;
+      }
     }
   }
 

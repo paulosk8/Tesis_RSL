@@ -156,12 +156,12 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
 
     const handleProceed = () => {
         const selectedIds = getSelectedArticles()
-        
+
         // Validar que todos los artículos recomendados tengan una decisión manual
-        const pendingArticles = recommendedArticles.filter(art => 
+        const pendingArticles = recommendedArticles.filter(art =>
             !reviewedArticles.has(art.id)
         )
-        
+
         if (pendingArticles.length > 0) {
             toast({
                 title: "⚠️ Revisión incompleta",
@@ -171,7 +171,7 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
             })
             return
         }
-        
+
         onProceedToManualReview(selectedIds)
     }
 
@@ -200,27 +200,15 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
             }
 
             // Enviar decisión al backend usando endpoint existente
-            const token = localStorage.getItem("token")
             const mappedStatus = finalDecision === 'include' ? 'included' : 'excluded'
-            const response = await fetch(
-                `${process.env.NEXT_PUBLIC_API_URL}/api/references/${selectedArticleId}/screening`,
-                {
-                    method: "PUT",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        status: mappedStatus,
-                        manualReviewStatus: mappedStatus,
-                        exclusionReason: finalDecision === 'exclude' ? exclusionReason : undefined
-                    })
-                }
-            )
-
-            if (!response.ok) {
-                throw new Error("Error al guardar la decisión")
-            }
+            const response = await apiClient.request(`/api/references/${selectedArticleId}/screening`, {
+                method: "PUT",
+                body: JSON.stringify({
+                    status: mappedStatus,
+                    manualReviewStatus: mappedStatus,
+                    exclusionReason: finalDecision === 'exclude' ? exclusionReason : undefined
+                })
+            })
 
             // Actualizar mapa local de revisados inmediatamente
             const newStatus = finalDecision === 'include' ? 'included' as const : 'excluded' as const
@@ -261,7 +249,7 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
     }
 
     // Obtener el artículo seleccionado
-    const selectedArticle = selectedArticleId 
+    const selectedArticle = selectedArticleId
         ? [...recommendedArticles].find((r: any) => r.id === selectedArticleId)
         : null
 
@@ -548,7 +536,7 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
                                         <h2 className="text-xl font-bold mb-3">{selectedArticle.title}</h2>
                                         <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                                             <span className="font-medium">
-                                                {selectedArticle.authors?.[0] || 'Sin autor'} 
+                                                {selectedArticle.authors?.[0] || 'Sin autor'}
                                                 {selectedArticle.authors && selectedArticle.authors.length > 1 ? ' et al.' : ''}
                                             </span>
                                             {selectedArticle.year && <span>• {selectedArticle.year}</span>}
@@ -590,7 +578,7 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
                                     {!isLocked && (
                                         <div className="space-y-4">
                                             <h3 className="font-semibold">Decisión de Revisión</h3>
-                                            
+
                                             {/* Sección de carga de PDF (compacta) */}
                                             <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/30">
                                                 <FileText className="h-5 w-5 text-muted-foreground flex-shrink-0" />
@@ -741,11 +729,11 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
                             const totalArticles = getSelectedArticles().length
                             const reviewedCount = recommendedArticles.filter(art => reviewedArticles.has(art.id)).length
                             const pendingCount = totalArticles - reviewedCount
-                            
+
                             return (
                                 <div className={cn(
                                     "text-sm flex items-center justify-between p-3 rounded-lg border",
-                                    pendingCount > 0 
+                                    pendingCount > 0
                                         ? "bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950/30 dark:border-amber-700 dark:text-amber-200"
                                         : "bg-green-50 border-green-200 text-green-800 dark:bg-green-950/30 dark:border-green-700 dark:text-green-200"
                                 )}>
@@ -760,7 +748,7 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
                                 </div>
                             )
                         })()}
-                        
+
                         {isLocked ? (
                             <div className="w-full text-center py-3 px-4 rounded-lg bg-green-50 border border-green-300 dark:!bg-green-950/60 dark:border-green-700">
                                 <p className="text-sm font-medium text-green-700 dark:text-green-300 flex items-center justify-center gap-2">
