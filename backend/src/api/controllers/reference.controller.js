@@ -572,7 +572,7 @@ const uploadPdf = async (req, res) => {
 
     // Construir URL absoluta del archivo apuntando al backend
     const backendUrl = process.env.BACKEND_URL || process.env.FRONTEND_URL?.replace('3000', '3001') || 'http://localhost:3001';
-    const fileUrl = `${backendUrl}/uploads/fulltext-results/${req.file.filename}`;
+    const fileUrl = `${backendUrl}/uploads/pdfs/${req.file.filename}`;
 
     // Actualizar la referencia en la base de datos
     const updated = await referenceRepository.update(id, {
@@ -647,7 +647,7 @@ const deletePdf = async (req, res) => {
       const fs = require('fs');
       // Extraer la ruta relativa del archivo desde la URL
       const filename = reference.fullTextUrl.split('/').pop();
-      const filePath = path.join(__dirname, '../../../uploads/fulltext-results', filename);
+      const filePath = path.join(__dirname, '../../../uploads/pdfs', filename);
       
       try {
         if (fs.existsSync(filePath)) {

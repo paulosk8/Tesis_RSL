@@ -105,26 +105,25 @@ class ReferenceRepository {
       'screeningStatus', 'aiClassification', 'aiConfidenceScore', 'aiReasoning',
       'manualReviewStatus', 'manualReviewNotes', 'reviewedBy', 'reviewedAt',
       'fullTextAvailable', 'fullTextUrl', 'screeningScore', 'aiDecision', 'exclusionReason',
-      'fullTextData', 'fullTextExtracted', 'fullTextExtractedAt', 'isDuplicate'
+      'fullTextData', 'fullTextExtracted', 'isDuplicate'
     ];
 
     const fieldMap = {
       screeningStatus: 'screening_status',
-      aiClassification: 'ai_classification',
-      aiConfidenceScore: 'ai_confidence_score',
+      aiClassification: 'classification_method',
+      aiConfidenceScore: 'priority_score',
       aiReasoning: 'ai_reasoning',
       manualReviewStatus: 'manual_review_status',
       manualReviewNotes: 'manual_review_notes',
       reviewedBy: 'reviewed_by',
       reviewedAt: 'reviewed_at',
-      fullTextAvailable: 'full_text_available',
-      fullTextUrl: 'full_text_url',
-      screeningScore: 'screening_score',
-      aiDecision: 'ai_decision',
+      fullTextAvailable: 'full_text_status',
+      fullTextUrl: 'full_text_path',
+      screeningScore: 'similarity_score',
+      aiDecision: 'status',
       exclusionReason: 'exclusion_reason',
       fullTextData: 'full_text_data',
       fullTextExtracted: 'full_text_extracted',
-      fullTextExtractedAt: 'full_text_extracted_at',
       isDuplicate: 'is_duplicate'
     };
 
@@ -136,6 +135,11 @@ class ReferenceRepository {
         // Convertir objetos a JSON string para JSONB
         if (field === 'fullTextData' && typeof referenceData[field] === 'object') {
           values.push(JSON.stringify(referenceData[field]));
+        }
+        else if (field === 'fullTextAvailable') {
+          // El booleano del frontend se guarda como string en BD
+          // o se pasa a boolean si en el futuro lo regresan a boolean... Pero asumo string 'available'/'unavailable'
+          values.push(referenceData[field] ? 'available' : 'unavailable');
         } else {
           values.push(referenceData[field]);
         }
@@ -176,10 +180,10 @@ class ReferenceRepository {
     const query = `
       UPDATE "references"
       SET 
-        ai_classification = $2,
+        classification_method = $2,
         ai_reasoning = $3,
-        ai_confidence_score = $4,
-        screening_score = $5,
+        priority_score = $4,
+        similarity_score = $5,
         screening_status = $6,
         updated_at = NOW()
       WHERE id = $1
@@ -262,11 +266,11 @@ class ReferenceRepository {
     const query = `
       SELECT 
         id, title, authors, year, abstract, keywords,
-        screening_status, screening_score, ai_classification,
-        ai_confidence_score, created_at
+        screening_status, similarity_score, classification_method,
+        priority_score, created_at
       FROM "references" 
       WHERE project_id = $1
-      ORDER BY screening_score DESC NULLS LAST, created_at DESC
+      ORDER BY similarity_score DESC NULLS LAST, created_at DESC
     `;
     
     const result = await database.query(query, [projectId]);

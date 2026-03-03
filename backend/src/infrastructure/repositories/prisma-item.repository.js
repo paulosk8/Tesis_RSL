@@ -111,9 +111,9 @@ class PrismaItemRepository {
       INSERT INTO prisma_items (
         project_id, item_number, section, completed, content,
         content_type, data_source, automated_content, last_human_edit,
-        ai_validated, ai_suggestions, ai_issues, completed_at, updated_at
+        ai_validated, validation_notes, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
       ON CONFLICT (project_id, item_number)
       DO UPDATE SET
         section = EXCLUDED.section,
@@ -124,12 +124,15 @@ class PrismaItemRepository {
         automated_content = EXCLUDED.automated_content,
         last_human_edit = EXCLUDED.last_human_edit,
         ai_validated = EXCLUDED.ai_validated,
-        ai_suggestions = EXCLUDED.ai_suggestions,
-        ai_issues = EXCLUDED.ai_issues,
-        completed_at = EXCLUDED.completed_at,
+        validation_notes = EXCLUDED.validation_notes,
         updated_at = NOW()
       RETURNING *
     `;
+
+    const validationNotes = JSON.stringify({
+      suggestions: item.aiSuggestions,
+      issues: item.aiIssues
+    });
 
     const values = [
       item.projectId,
@@ -142,9 +145,7 @@ class PrismaItemRepository {
       item.automatedContent,
       item.lastHumanEdit,
       item.aiValidated,
-      item.aiSuggestions,
-      JSON.stringify(item.aiIssues),
-      item.completedAt
+      validationNotes
     ];
 
     const result = await database.query(query, values);
@@ -170,9 +171,9 @@ class PrismaItemRepository {
           INSERT INTO prisma_items (
             project_id, item_number, section, completed, content,
             content_type, data_source, automated_content, last_human_edit,
-            ai_validated, ai_suggestions, ai_issues, completed_at, updated_at
+            ai_validated, validation_notes, updated_at
           )
-          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW())
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
           ON CONFLICT (project_id, item_number)
           DO UPDATE SET
             section = EXCLUDED.section,
@@ -183,11 +184,14 @@ class PrismaItemRepository {
             automated_content = EXCLUDED.automated_content,
             last_human_edit = EXCLUDED.last_human_edit,
             ai_validated = EXCLUDED.ai_validated,
-            ai_suggestions = EXCLUDED.ai_suggestions,
-            ai_issues = EXCLUDED.ai_issues,
-            completed_at = EXCLUDED.completed_at,
+            validation_notes = EXCLUDED.validation_notes,
             updated_at = NOW()
         `;
+
+        const validationNotes = JSON.stringify({
+          suggestions: item.aiSuggestions,
+          issues: item.aiIssues
+        });
 
         const values = [
           item.projectId,
@@ -200,9 +204,7 @@ class PrismaItemRepository {
           item.automatedContent,
           item.lastHumanEdit,
           item.aiValidated,
-          item.aiSuggestions,
-          JSON.stringify(item.aiIssues),
-          item.completedAt
+          validationNotes
         ];
 
         await client.query(query, values);
@@ -306,17 +308,20 @@ class PrismaItemRepository {
       UPDATE prisma_items
       SET 
         ai_validated = $1,
-        ai_suggestions = $2,
-        ai_issues = $3,
+        validation_notes = $2,
         updated_at = NOW()
-      WHERE project_id = $4 AND item_number = $5
+      WHERE project_id = $3 AND item_number = $4
       RETURNING *
     `;
 
+    const validationNotes = JSON.stringify({
+      suggestions: aiValidation.suggestions || null,
+      issues: aiValidation.issues || []
+    });
+
     const values = [
       aiValidation.validated || false,
-      aiValidation.suggestions || null,
-      JSON.stringify(aiValidation.issues || []),
+      validationNotes,
       projectId,
       itemNumber
     ];

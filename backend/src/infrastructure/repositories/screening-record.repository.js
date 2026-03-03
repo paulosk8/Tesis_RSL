@@ -260,16 +260,16 @@ class ScreeningRecordRepository {
   async getAllScores(projectId, stage = 'fulltext') {
     // Intentar desde references (screening híbrido)
     const refQuery = `
-      SELECT screening_score 
+      SELECT similarity_score 
       FROM "references" 
-      WHERE project_id = $1 AND screening_score IS NOT NULL
-      ORDER BY screening_score DESC
+      WHERE project_id = $1 AND similarity_score IS NOT NULL
+      ORDER BY similarity_score DESC
     `;
     const refResult = await database.query(refQuery, [projectId]);
     
     if (refResult.rows.length > 0) {
       console.log(`📊 Scores encontrados en references: ${refResult.rows.length} puntos`);
-      return refResult.rows.map(r => Number.parseFloat(r.screening_score));
+      return refResult.rows.map(r => Number.parseFloat(r.similarity_score));
     }
     
     // Fallback: buscar en screening_records

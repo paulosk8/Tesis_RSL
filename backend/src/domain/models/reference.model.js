@@ -32,13 +32,13 @@ class Reference {
     
     // Estado de cribado
     this.screeningStatus = data.screening_status || data.screeningStatus || 'pending';
-    this.screeningScore = data.screening_score || data.screeningScore;
+    this.screeningScore = data.similarity_score || data.screening_score || data.screeningScore;
     this.exclusionReason = data.exclusion_reason || data.exclusionReason;
     this.isDuplicate = data.is_duplicate || data.isDuplicate || false;
     
     // IA y clasificación
-    this.aiClassification = data.ai_classification || data.aiClassification;
-    this.aiConfidenceScore = data.ai_confidence_score || data.aiConfidenceScore;
+    this.aiClassification = data.classification_method || data.ai_classification || data.aiClassification;
+    this.aiConfidenceScore = data.priority_score || data.ai_confidence_score || data.aiConfidenceScore;
     this.aiReasoning = data.ai_reasoning || data.aiReasoning;
     
     // Revisión manual
@@ -51,8 +51,8 @@ class Reference {
     this.source = data.source;
     this.bibtexEntry = data.bibtex_entry || data.bibtexEntry;
     this.citationKey = data.citation_key || data.citationKey;
-    this.fullTextAvailable = data.full_text_available || data.fullTextAvailable || false;
-    this.fullTextUrl = data.full_text_url || data.fullTextUrl;
+    this.fullTextAvailable = data.full_text_status === 'available' || data.fullTextAvailable || false;
+    this.fullTextUrl = data.full_text_path || data.fullTextUrl;
     
     // Datos extraídos de PDF (NUEVO)
     this.fullTextData = data.full_text_data || data.fullTextData;
@@ -127,11 +127,11 @@ class Reference {
       keywords: this.keywords,
       url: this.url,
       screening_status: this.screeningStatus,
-      screening_score: this.screeningScore,
+      similarity_score: this.screeningScore,
       exclusion_reason: this.exclusionReason,
       is_duplicate: this.isDuplicate,
-      ai_classification: this.aiClassification,
-      ai_confidence_score: this.aiConfidenceScore,
+      classification_method: this.aiClassification,
+      priority_score: this.aiConfidenceScore,
       ai_reasoning: this.aiReasoning,
       manual_review_status: this.manualReviewStatus,
       manual_review_notes: this.manualReviewNotes,
@@ -140,8 +140,8 @@ class Reference {
       source: this.source,
       bibtex_entry: this.bibtexEntry,
       citation_key: this.citationKey,
-      full_text_available: this.fullTextAvailable,
-      full_text_url: this.fullTextUrl,
+      full_text_status: this.fullTextAvailable ? 'available' : 'unavailable',
+      full_text_path: this.fullTextUrl,
       full_text_data: typeof this.fullTextData === 'object' ? JSON.stringify(this.fullTextData) : this.fullTextData,
       full_text_extracted: this.fullTextExtracted,
       full_text_extracted_at: this.fullTextExtractedAt,

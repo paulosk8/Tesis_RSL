@@ -47,10 +47,16 @@ class CompletePrismaByBlocksUseCase {
       const results = {};
 
       // 3. Ejecutar cada bloque secuencialmente
-      for (const blockName of blocks) {
+      for (let i = 0; i < blocks.length; i++) {
+        const blockName = blocks[i];
         console.log(`Procesando bloque: ${blockName.toUpperCase()}`);
         const blockResult = await this.processBlock(projectId, blockName, prismaContext);
         results[blockName] = blockResult;
+        
+        if (blocks.length > 1 && i < blocks.length - 1) {
+          console.log("⏱️ Esperando 35s para evitar Error 429 de Gemini Free Tier...");
+          await new Promise(resolve => setTimeout(resolve, 35000));
+        }
       }
 
       // 4. Obtener estadísticas actualizadas
@@ -93,11 +99,20 @@ class CompletePrismaByBlocksUseCase {
     // Parsear respuesta
     let itemsData;
     try {
-      const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+      let cleanResponse = aiResponse.trim();
+      // Eliminar markdown ```json ... ``` si existe
+      if (cleanResponse.startsWith('```')) {
+        const lines = cleanResponse.split('\n');
+        if (lines[0].startsWith('```')) lines.shift();
+        if (lines[lines.length - 1].startsWith('```')) lines.pop();
+        cleanResponse = lines.join('\n');
+      }
+      
+      const jsonMatch = cleanResponse.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         itemsData = JSON.parse(jsonMatch[0]);
       } else {
-        itemsData = JSON.parse(aiResponse);
+        itemsData = JSON.parse(cleanResponse);
       }
       console.log(`JSON parseado: ${itemsData.items?.length || 0} ítems`);
     } catch (error) {

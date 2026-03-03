@@ -19,19 +19,19 @@ import { useRouter } from "next/navigation"
 import { apiClient } from "@/lib/api-client"
 
 const PRISMA_WPOM_ITEMS = [
-  { id: "prisma-1", number: 1, question: "�Es entendible por alguien que no es experto?", autoFillKey: "clarity" },
-  { id: "prisma-2", number: 2, question: "�Se definen claramente las \"variables\"?", autoFillKey: "variables" },
-  { id: "prisma-3", number: 3, question: "�Se describe la justificaci�n de la revisi�n en relaci�n con lo que se conoce?", autoFillKey: "rationale" },
-  { id: "prisma-4", number: 4, question: "�Se proporciona una declaraci�n expl�cita de las preguntas usando PICOS?", autoFillKey: "pico" },
-  { id: "prisma-5", number: 5, question: "Si extiende investigaciones previas, �explica por qu� se necesita este estudio?", autoFillKey: "need" },
-  { id: "prisma-6", number: 6, question: "�Se especifica y justifica la estrategia de b�squeda (manual, automatizada o mixta)?", autoFillKey: "searchStrategy" },
-  { id: "prisma-7", number: 7, question: "�Se identifican los criterios de inclusi�n y exclusi�n de estudios primarios?", autoFillKey: "criteria" },
-  { id: "prisma-8", number: 8, question: "�Se describen todas las fuentes de informaci�n utilizadas y fechas de cobertura?", autoFillKey: "sources" },
-  { id: "prisma-9", number: 9, question: "�Se presenta la estrategia electr�nica de b�squeda completa para al menos una base de datos?", autoFillKey: "searchString" },
-  { id: "prisma-10", number: 10, question: "�Se identifican las revistas y conferencias para b�squedas manuales?", autoFillKey: "manualSearch" },
-  { id: "prisma-11", number: 11, question: "�Se especifica el per�odo temporal de cobertura y su justificaci�n?", autoFillKey: "temporalRange" },
-  { id: "prisma-12", number: 12, question: "�Se indican procedimientos auxiliares (e.g., consultas a expertos, revisi�n de bibliograf�a secundaria)?", autoFillKey: "auxiliary" },
-  { id: "prisma-13", number: 13, question: "�Se describe c�mo se evaluar� el proceso de b�squeda (comparaci�n con revisi�n previa, etc.)?", autoFillKey: "validation" }
+  { id: "prisma-1", number: 1, question: "¿Es entendible por alguien que no es experto?", autoFillKey: "clarity" },
+  { id: "prisma-2", number: 2, question: "¿Se definen claramente las \"variables\"?", autoFillKey: "variables" },
+  { id: "prisma-3", number: 3, question: "¿Se describe la justificación de la revisión en relación con lo que se conoce?", autoFillKey: "rationale" },
+  { id: "prisma-4", number: 4, question: "¿Se proporciona una declaración explícita de las preguntas usando PICOS?", autoFillKey: "pico" },
+  { id: "prisma-5", number: 5, question: "Si extiende investigaciones previas, �explica por qué se necesita este estudio?", autoFillKey: "need" },
+  { id: "prisma-6", number: 6, question: "¿Se especifica y justifica la estrategia de búsqueda (manual, automatizada o mixta)?", autoFillKey: "searchStrategy" },
+  { id: "prisma-7", number: 7, question: "¿Se identifican los criterios de inclusión y exclusión de estudios primarios?", autoFillKey: "criteria" },
+  { id: "prisma-8", number: 8, question: "¿Se describen todas las fuentes de información utilizadas y fechas de cobertura?", autoFillKey: "sources" },
+  { id: "prisma-9", number: 9, question: "¿Se presenta la estrategia electrónica de búsqueda completa para al menos una base de datos?", autoFillKey: "searchString" },
+  { id: "prisma-10", number: 10, question: "¿Se identifican las revistas y conferencias para búsquedas manuales?", autoFillKey: "manualSearch" },
+  { id: "prisma-11", number: 11, question: "¿Se especifica el período temporal de cobertura y su justificación?", autoFillKey: "temporalRange" },
+  { id: "prisma-12", number: 12, question: "¿Se indican procedimientos auxiliares (e.g., consultas a expertos, revisión de bibliografía secundaria)?", autoFillKey: "auxiliary" },
+  { id: "prisma-13", number: 13, question: "¿Se describe cómo se evaluará el proceso de búsqueda (comparaci�n con revisión previa, etc.)?", autoFillKey: "validation" }
 ]
 
 export function PrismaCheckStep() {
@@ -41,7 +41,7 @@ export function PrismaCheckStep() {
   const [prismaData, setPrismaData] = useState<Record<string, { complies: boolean | null; evidence: string }>>({})
   const [isSaving, setIsSaving] = useState(false)
 
-  // Determinar qu� bases de datos tienen referencias cargadas
+  // Determinar qué bases de datos tienen referencias cargadas
   const uploadedFiles = data.searchPlan?.uploadedFiles || []
   const databasesWithRefs = new Set(uploadedFiles.map((f: any) => f.databaseId))
   const allQueries = data.searchPlan?.searchQueries || []
@@ -86,7 +86,7 @@ export function PrismaCheckStep() {
     try {
       // VALIDAR que existe proyecto (creado en step 3)
       if (!data.projectId) {
-        throw new Error('No hay proyecto creado. Regresa al paso 3 para seleccionar un t�tulo y crear el proyecto.')
+        throw new Error('No hay proyecto creado. Regresa al paso 3 para seleccionar un título y crear el proyecto.')
       }
 
       // Datos del protocolo COMPLETO para actualizar proyecto existente
@@ -157,7 +157,7 @@ export function PrismaCheckStep() {
 
       // Datos de actualizaci�n del proyecto (cambiar a estado 'in-progress')
       const projectUpdateData = {
-        title: data.selectedTitle, // Limpiar t�tulo (quitar [TEMPORAL] si exist�a)
+        title: data.selectedTitle, // Limpiar título (quitar [TEMPORAL] si exist�a)
         description: data.projectDescription,
         status: 'in-progress', // Cambiar de 'draft' a 'in-progress'
         researchArea: data.researchArea
@@ -175,11 +175,11 @@ export function PrismaCheckStep() {
         databases: databaseNames,
         searchString: searchString,
         searchQueries: queries,
-        researchArea: data.researchArea, // Guardar �rea de investigaci�n
+        researchArea: data.researchArea, // Guardar área de investigaci�n
         temporalRange: {
           start: data.yearStart || 2019,
           end: data.yearEnd || new Date().getFullYear(),
-          justification: `Rango temporal definido para cubrir investigaciones recientes en ${data.researchArea || 'el �rea de estudio'}`
+          justification: `Rango temporal definido para cubrir investigaciones recientes en ${data.researchArea || 'el área de estudio'}`
         },
         keyTerms: {
           technology: (data.protocolDefinition?.technologies || data.protocolTerms?.tecnologia || []).filter((_, idx) => !data.discardedTerms?.tecnologia?.has(idx)),
@@ -204,7 +204,7 @@ export function PrismaCheckStep() {
       await apiClient.updateProtocol(data.projectId, protocolData)
       // Luego actualizar el proyecto (solo campos b�sicos)
       // El m�todo request() lanza error si la respuesta no es exitosa, 
-      // por lo que si llegamos aqu� sin error, el proyecto se actualiz� correctamente
+      // por lo que si llegamos aqué sin error, el proyecto se actualiz� correctamente
       await apiClient.updateProject(data.projectId, projectUpdateData as any)
       // Limpiar localStorage del wizard para evitar conflictos
       try {
@@ -215,7 +215,7 @@ export function PrismaCheckStep() {
       
       toast({
         title: "Proyecto completado exitosamente",
-        description: "Tu revisi�n sistem�tica est� lista para la fase de ejecuci�n"
+        description: "Tu revisión sistemática est� lista para la fase de ejecución"
       })
       
       updateData({ lastSaved: new Date() })
@@ -237,16 +237,16 @@ export function PrismaCheckStep() {
   }
 
   const compliance = calculateCompliance()
-  const researchArea = data.researchArea || "su �rea de investigaci�n"
+  const researchArea = data.researchArea || "su área de investigaci�n"
   const themaCentral = data.projectName || "tema central"
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12">
       {/* Header consistente con otras secciones */}
       <div className="text-center space-y-3 mb-8">
-        <h2 className="text-2xl font-bold">Confirmaci�n del Protocolo</h2>
+        <h2 className="text-2xl font-bold">Confirmación del Protocolo</h2>
         <p className="text-base text-muted-foreground">
-          Resumen y confirmaci�n final de tu revisi�n sistem�tica en {researchArea}
+          Resumen y confirmaci�n final de tu revisión sistemática en {researchArea}
         </p>
       </div>
 
@@ -260,7 +260,7 @@ export function PrismaCheckStep() {
             <div>
               <CardTitle className="text-xl">Reporte Final del Protocolo</CardTitle>
               <CardDescription className="text-primary-foreground/80 mt-1">
-                Resumen ejecutivo de tu revisi�n sistem�tica
+                Resumen ejecutivo de tu revisión sistemática
               </CardDescription>
             </div>
           </div>
@@ -269,19 +269,19 @@ export function PrismaCheckStep() {
           {/* Mensaje informativo */}
           <div className="border-l-4 border-primary pl-4 bg-primary/5 p-3 rounded-r">
             <p className="text-sm text-foreground">
-              Este es el paso final de tu protocolo de investigaci�n. A continuaci�n se presenta el <strong>resumen completo</strong> de toda la informaci�n generada durante la planificaci�n.
+              Este es el paso final de tu protocolo de investigaci�n. A continuaci�n se presenta el <strong>resumen completo</strong> de toda la información generada durante la planificaci�n.
             </p>
           </div>
 
-          {/* T�tulo del Proyecto */}
+          {/* Título del Proyecto */}
           <div className="p-4 rounded-lg border-2 border-primary/20">
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              T�tulo de la Investigaci�n
+              Título de la Investigaci�n
             </div>
             <p className="text-base font-semibold mt-1 text-gray-900 dark:text-gray-100">{data.selectedTitle}</p>
           </div>
 
-          {/* Estad�sticas */}
+          {/* Estadísticas */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="p-4 rounded-lg border-2 border-primary/20">
               <div className="text-xs font-semibold text-muted-foreground uppercase">Bases de Datos</div>
@@ -296,7 +296,7 @@ export function PrismaCheckStep() {
               </div>
             </div>
             <div className="p-4 rounded-lg border-2 border-primary/20">
-              <div className="text-xs font-semibold text-muted-foreground uppercase">T�rminos Clave</div>
+              <div className="text-xs font-semibold text-muted-foreground uppercase">Términos Clave</div>
               <div className="text-2xl font-bold text-foreground mt-2">
                 {(data.protocolTerms?.tecnologia?.length || 0) + (data.protocolTerms?.dominio?.length || 0) + (data.protocolTerms?.focosTematicos?.length || 0)}
               </div>
@@ -314,7 +314,7 @@ export function PrismaCheckStep() {
               <p className="font-medium mt-1 text-foreground">{data.projectName}</p>
             </div>
             <div className="p-3 rounded-lg border border-border">
-              <span className="text-xs font-semibold text-muted-foreground uppercase">�rea de Investigaci�n</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase">área de Investigaci�n</span>
               <p className="font-medium mt-1 text-gray-900 dark:text-gray-100">{researchArea.replace('-', ' ').toUpperCase()}</p>
             </div>
             <div className="p-3 rounded-lg border border-border">
@@ -323,7 +323,7 @@ export function PrismaCheckStep() {
             </div>
           </div>
 
-          {/* --- SECCI�N: Marco PICO --- */}
+          {/* --- SECCIÓN: Marco PICO --- */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 border-b pb-2">
               <Target className="h-5 w-5 text-primary" />
@@ -331,15 +331,15 @@ export function PrismaCheckStep() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
-                <span className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase">P - Poblaci�n / Contexto</span>
+                <span className="text-xs font-bold text-blue-700 dark:text-blue-300 uppercase">P - Población / Contexto</span>
                 <p className="text-sm mt-1 text-foreground">{data.pico?.population || 'No definido'}</p>
               </div>
               <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
-                <span className="text-xs font-bold text-green-700 dark:text-green-300 uppercase">I - Intervenci�n</span>
+                <span className="text-xs font-bold text-green-700 dark:text-green-300 uppercase">I - Intervención</span>
                 <p className="text-sm mt-1 text-foreground">{data.pico?.intervention || 'No definido'}</p>
               </div>
               <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800">
-                <span className="text-xs font-bold text-amber-700 dark:text-amber-300 uppercase">C - Comparaci�n</span>
+                <span className="text-xs font-bold text-amber-700 dark:text-amber-300 uppercase">C - Comparación</span>
                 <p className="text-sm mt-1 text-foreground">{data.pico?.comparison || 'No aplica'}</p>
               </div>
               <div className="p-3 rounded-lg bg-purple-50 dark:bg-purple-950/30 border border-purple-200 dark:border-purple-800">
@@ -350,17 +350,17 @@ export function PrismaCheckStep() {
           </div>
 
 
-          {/* --- SECCI�N: T�rminos del Protocolo --- */}
+          {/* --- SECCIÓN: Términos del Protocolo --- */}
           {((data.protocolTerms?.tecnologia?.length ?? 0) > 0 || (data.protocolTerms?.dominio?.length ?? 0) > 0 || (data.protocolTerms?.focosTematicos?.length ?? 0) > 0) && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 border-b pb-2">
                 <BookOpen className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold text-base">T�rminos del Protocolo</h3>
+                <h3 className="font-semibold text-base">Términos del Protocolo</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {(data.protocolTerms?.tecnologia?.length ?? 0) > 0 && (
                   <div className="p-3 rounded-lg border border-border">
-                    <span className="text-xs font-bold text-muted-foreground uppercase">Tecnolog�a / Herramienta</span>
+                    <span className="text-xs font-bold text-muted-foreground uppercase">Tecnología / Herramienta</span>
                     <ul className="mt-1 space-y-1">
                       {data.protocolTerms?.tecnologia?.map((t: string) => (
                         <li key={t} className="text-sm text-foreground flex items-start gap-1">
@@ -372,7 +372,7 @@ export function PrismaCheckStep() {
                 )}
                 {(data.protocolTerms?.dominio?.length ?? 0) > 0 && (
                   <div className="p-3 rounded-lg border border-border">
-                    <span className="text-xs font-bold text-muted-foreground uppercase">Dominio de Aplicaci�n</span>
+                    <span className="text-xs font-bold text-muted-foreground uppercase">Dominio de Aplicación</span>
                     <ul className="mt-1 space-y-1">
                       {data.protocolTerms?.dominio?.map((d: string) => (
                         <li key={d} className="text-sm text-foreground flex items-start gap-1">
@@ -396,7 +396,7 @@ export function PrismaCheckStep() {
                 )}
                 {(data.protocolTerms?.focosTematicos?.length ?? 0) > 0 && (
                   <div className="p-3 rounded-lg border border-border">
-                    <span className="text-xs font-bold text-muted-foreground uppercase">Focos Tem�ticos</span>
+                    <span className="text-xs font-bold text-muted-foreground uppercase">Focos Temáticos</span>
                     <ul className="mt-1 space-y-1">
                       {data.protocolTerms?.focosTematicos?.map((f: string) => (
                         <li key={f} className="text-sm text-foreground flex items-start gap-1">
@@ -410,7 +410,7 @@ export function PrismaCheckStep() {
             </div>
           )}
 
-          {/* --- SECCI�N: Criterios de Inclusi�n y Exclusi�n --- */}
+          {/* --- SECCIÓN: Criterios de Inclusi�n y Exclusi�n --- */}
           {(data.inclusionCriteria?.length > 0 || data.exclusionCriteria?.length > 0) && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 border-b pb-2">
@@ -442,7 +442,7 @@ export function PrismaCheckStep() {
             </div>
           )}
 
-          {/* --- SECCI�N: Bases de Datos y Cadenas de B�squeda --- */}
+          {/* --- SECCIÓN: Bases de Datos y Cadenas de B�squeda --- */}
           {queriesWithRefs.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 border-b pb-2">
@@ -471,7 +471,7 @@ export function PrismaCheckStep() {
             </div>
           )}
 
-          {/* --- Bot�n de Confirmaci�n --- */}
+          {/* --- Botón de Confirmación --- */}
           <div className="text-center space-y-4 pt-4">
             <Button
               size="lg"
@@ -492,7 +492,7 @@ export function PrismaCheckStep() {
               )}
             </Button>
             <p className="text-xs text-muted-foreground">
-              Al confirmar, se crear� tu proyecto y podr�s comenzar con la fase de ejecuci�n
+              Al confirmar, se creará tu proyecto y podrás comenzar con la fase de ejecución
             </p>
           </div>
         </CardContent>

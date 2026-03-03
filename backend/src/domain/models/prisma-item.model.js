@@ -27,8 +27,18 @@ class PrismaItem {
     
     // Validación con IA
     this.aiValidated = data.ai_validated || data.aiValidated || false;
-    this.aiSuggestions = data.ai_suggestions || data.aiSuggestions;
-    this.aiIssues = data.ai_issues || data.aiIssues || [];
+    
+    let parsedNotes = { suggestions: null, issues: [] };
+    if (data.validation_notes) {
+      if (typeof data.validation_notes === 'string') {
+        try { parsedNotes = JSON.parse(data.validation_notes); } catch (e) {}
+      } else {
+        parsedNotes = data.validation_notes;
+      }
+    }
+    
+    this.aiSuggestions = data.ai_suggestions || data.aiSuggestions || parsedNotes.suggestions;
+    this.aiIssues = data.ai_issues || data.aiIssues || parsedNotes.issues || [];
     
     // Metadatos
     this.completedAt = data.completed_at || data.completedAt;
@@ -103,9 +113,10 @@ class PrismaItem {
       automated_content: this.automatedContent,
       last_human_edit: this.lastHumanEdit,
       ai_validated: this.aiValidated,
-      ai_suggestions: this.aiSuggestions,
-      ai_issues: JSON.stringify(this.aiIssues),
-      completed_at: this.completedAt,
+      validation_notes: JSON.stringify({
+        suggestions: this.aiSuggestions,
+        issues: this.aiIssues
+      }),
       updated_at: this.updatedAt
     };
   }
