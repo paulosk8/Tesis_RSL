@@ -148,8 +148,11 @@ class PythonGraphService {
                     console.log('📊 Resultados parseados:', results);
                     
                     // Convertir a URLs relativas para que funcionen tras el proxy del frontend (o absolutas dinámicamente)
-                    // No incluir process.env.BACKEND_URL para evitar problemas CORS / Docker en production
-                    const baseUrl = '';
+                    // Usar BACKEND_URL si existe para producción (especialmente en Render/Vercel)
+                    const baseUrl = process.env.BACKEND_URL || '';
+                    if (baseUrl) {
+                        console.log(`🌐 Usando base URL absoluta para gráficos: ${baseUrl}`);
+                    }
                     
                     // Cache-busting: agregar timestamp para evitar que el navegador use versiones antiguas
                     const timestamp = Date.now();
