@@ -202,10 +202,11 @@ ${text}`;
         }
       });
 
-      // Asegurar que rq1-rq3 existan aunque el protocolo tenga menos de 3 RQs
-      for (let j = 1; j <= 3; j++) {
-        if (!entry[`rq${j}Relation`]) entry[`rq${j}Relation`] = 'no';
-      }
+      // Asegurar que rq1-rqN existan
+      researchQuestions.forEach((_, i) => {
+        const rqKey = `rq${i + 1}Relation`;
+        if (!entry[rqKey]) entry[rqKey] = 'no';
+      });
 
       return entry;
     });
@@ -337,7 +338,7 @@ ${text}`;
       console.log(`⚠️  LA IA GEMINI DEBE USAR SOLO ESTOS ${rqsEntries.length} ESTUDIOS, NO PUEDE INVENTAR MÁS`);
 
       // 3. Calcular estadísticas detalladas RQS
-      const rqsStats = this.calculateDetailedRQSStatistics(rqsEntries);
+      const rqsStats = this.calculateDetailedRQSStatistics(rqsEntries, prismaContext.protocol || {});
       console.log(`📈 Estadísticas RQS calculadas:`, {
         tipos: Object.keys(rqsStats.studyTypes).length,
         tecnologías: rqsStats.technologies.length,
@@ -494,7 +495,7 @@ ${text}`;
       article.metadata.editorialStandards.conclusionsWords = article.conclusions.split(/\s+/).filter(w => w.length > 0).length;
 
       // Validación de calidad
-      this.validateArticleQuality(article);
+      this.validateArticleQuality(article, prismaContext.protocol || {});
 
       console.log('✅ Artículo profesional generado exitosamente');
       console.log(`📊 Palabras totales: ${article.metadata.wordCount}`);
@@ -535,9 +536,11 @@ PROCESSED RQS DATA (${rqsStats.total} studies):
 - Temporal distribution: ${rqsStats.yearRange.min}-${rqsStats.yearRange.max}
 - Main technologies: ${rqsStats.technologies.slice(0, 3).map(t => `${t.technology} (n=${t.count})`).join(', ')}
 - Application contexts: ${JSON.stringify(rqsStats.contexts)}
-- RQ1 coverage: ${rqsStats.rqRelations.rq1.yes} direct, ${rqsStats.rqRelations.rq1.partial} partial
-- RQ2 coverage: ${rqsStats.rqRelations.rq2.yes} direct, ${rqsStats.rqRelations.rq2.partial} partial
-- RQ3 coverage: ${rqsStats.rqRelations.rq3.yes} direct, ${rqsStats.rqRelations.rq3.partial} partial
+RQ Coverage:
+${Object.keys(rqsStats.rqRelations).map((rqKey, i) => {
+  const rel = rqsStats.rqRelations[rqKey];
+  return `- ${rqKey.toUpperCase()} coverage: ${rel.yes} direct, ${rel.partial} partial`;
+}).join('\n')}
 
 Write ONE cohesive paragraph with FOUR clearly delineated sub-segments (no headings, no line breaks):
 
@@ -670,9 +673,7 @@ ${referencesList}
 
 "To address these objectives, this systematic review seeks to answer the following research questions:
 
-- **RQ1**: [exact text of first research question]
-- **RQ2**: [exact text of second research question]  
-- **RQ3**: [exact text of third research question]"
+${prismaContext.protocol.researchQuestions.map((rq, i) => `- **RQ${i + 1}**: [exact text of research question ${i + 1} from below]`).join('\n')}"
 
 **WRITING STYLE:**
 - Third person impersonal
@@ -792,21 +793,9 @@ ${searchChart}
 
 The complete strategies for all databases are available in the supplementary material.
 
-## 2.4 AI-Assisted Hybrid Screening
 
-To optimize the screening process and reduce manual effort without compromising recall, a two-phase hybrid approach combining artificial intelligence with human expert review was implemented.
+The study selection process followed a standardized multi-phase approach as detailed in Section 2.5, prioritizing methodological rigor and minimizing reporting bias.
 
-**Phase 1 — Semantic Similarity Ranking (Embeddings):** Each downloaded reference was processed through a semantic similarity model (text-embedding-ada-002, OpenAI) that computed a cosine similarity score in the range [0, 1] against a vector representation of the predefined PICO-based inclusion criteria. ${prismaContext.screening.phase1 ? `The model processed ${prismaContext.screening.phase1.highConfidenceInclude + prismaContext.screening.phase1.highConfidenceExclude + prismaContext.screening.phase1.greyZone} references with an average similarity score of ${(prismaContext.screening.phase1.avgSimilarity * 100).toFixed(1)}%. Using adaptive percentile thresholds${prismaContext.screening.similarityThresholds ? ` (upper: ${(prismaContext.screening.similarityThresholds.embeddings * 100).toFixed(1)}%)` : ''}, references were triaged into three categories: **${prismaContext.screening.phase1.highConfidenceInclude} high-confidence includes** (above upper threshold), **${prismaContext.screening.phase1.highConfidenceExclude} high-confidence excludes** (below lower threshold), and **${prismaContext.screening.phase1.greyZone} grey-zone references** requiring further analysis.` : 'References were triaged into three categories based on adaptive percentile thresholds: high-confidence includes, high-confidence excludes, and grey-zone references requiring further analysis.'}
-
-**Phase 2 — LLM-Based Grey Zone Analysis (Gemini/ChatGPT):** ${prismaContext.screening.phase2 ? `The ${prismaContext.screening.phase2.analyzed} grey-zone references were individually evaluated by a large language model (${prismaContext.screening.phase2.method || 'Gemini 2.5 Pro'}) prompted with the PICO criteria and inclusion/exclusion rules. The LLM classified each reference as: **${prismaContext.screening.phase2.included} included**, **${prismaContext.screening.phase2.excluded} excluded**, and **${prismaContext.screening.phase2.manual} flagged for manual review** by the principal investigator.` : 'Grey-zone references were individually evaluated by a large language model prompted with the PICO criteria and inclusion/exclusion rules, classifying each as included, excluded, or flagged for manual review.'}
-
-The resulting scores were sorted in descending order and plotted as a scree curve (Figure 2). The **elbow method** (knee-point detection) was applied to this curve to identify the optimal inflection point—the threshold below which the marginal gain in relevant study recovery diminishes sharply.
-
-${screePlot || '**[FIGURE 2: Scree Plot — Distribution of AI relevance scores with elbow point]**\n*Figure 2. Distribution of semantic relevance scores sorted in descending order. The vertical line marks the elbow point used as the prioritization threshold.*'}
-
-**Rationale for hybrid approach**: The two-phase design leverages the complementary strengths of embedding-based similarity (fast, deterministic ranking) and LLM-based analysis (contextual understanding of eligibility criteria). The elbow method mitigates potential algorithmic bias by ensuring that the cut-off point is data-driven rather than arbitrarily set. References above the threshold were prioritized for manual review, while those below it were still reviewed in a second pass, ensuring no relevant study was excluded solely based on the algorithmic score.
-
-It is important to emphasize that the AI scores were used exclusively for **prioritization and triage**, not for final inclusion/exclusion decisions. All final decisions were made by human reviewers applying the predefined PICO-based eligibility criteria.
 
 ## 2.5 Selection Process
 
@@ -814,7 +803,7 @@ ${selectionProcess}
 
 The process followed four phases:
 1. **Duplicate removal**: Automated deduplication identified and removed duplicate references across databases.
-2. **AI-assisted prioritization**: The hybrid screening system (Phase 1: embeddings + Phase 2: LLM) processed all unique references to compute relevance scores and triage classifications (see Section 2.4).
+2. **AI-assisted prioritization**: A hybrid screening system (Embeddings + LLM) was used to compute relevance scores. Data-driven prioritization was validated via the elbow method to optimize manual review effort.
 3. **Title and abstract screening**: References prioritized by the AI system were evaluated by the principal investigator using the predefined PICO-based criteria. The AI classifications served as decision support, with the human reviewer making all final decisions.
 4. **Full-text review**: Articles that passed the initial screening were retrieved in full text and evaluated against the complete eligibility criteria, including assessment of methodological quality.
 
@@ -839,9 +828,7 @@ Data were extracted using a structured and standardized RQS (Research Question S
 - Reported evaluation metrics
 
 **Relationship with research questions:**
-- Pertinence assessment for RQ1 (direct/partial/none)
-- Pertinence assessment for RQ2 (direct/partial/none)
-- Pertinence assessment for RQ3 (direct/partial/none)
+${(prismaContext.protocol.researchQuestions || []).map((_, i) => `- Pertinence assessment for RQ${i + 1} (direct/partial/none)`).join('\n')}
 - Key extracted evidence
 - Relevant textual quotations (with page)
 
@@ -880,22 +867,46 @@ The synthesis was organized around the three research questions, integrating fin
     // Generar análisis RQS detallado
     const rqsAnalysis = await this.generateDetailedRQSAnalysis(rqsEntries, rqsStats, prismaContext);
 
-    const rq1Synthesis = rqsEntries.length > 0 ? await this.synthesizeRQ1Findings(rqsEntries, prismaContext) : 'No studies were identified that addressed this question.';
-    const rq2Synthesis = rqsEntries.length > 0 ? await this.synthesizeRQ2Findings(rqsEntries, prismaContext) : 'No studies were identified that addressed this question.';
-    const rq3Synthesis = rqsEntries.length > 0 ? await this.synthesizeRQ3Findings(rqsEntries, prismaContext) : 'No studies were identified that addressed this question.';
 
     // Translate PRISMA items and RQs that may be in Spanish
     console.log('🔄 Translating Results PRISMA content to English...');
     const rqs = prismaContext.protocol.researchQuestions || [];
-    const [studySelection, riskOfBiasResults,
-           rq1Label, rq2Label, rq3Label] = await Promise.all([
-      this.translateToEnglish(prismaMapping.results.studySelection),
-      this.translateToEnglish(prismaMapping.results.riskOfBiasResults),
-      this.translateToEnglish(rqs[0] || 'First research question'),
-      this.translateToEnglish(rqs[1] || 'Second research question'),
-      this.translateToEnglish(rqs[2] || 'Third research question'),
-    ]);
-    console.log('✅ Results translation completed');
+    
+    // Preparar textos para traducción masiva
+    const textsToTranslate = [
+      prismaMapping.results.studySelection,
+      prismaMapping.results.riskOfBiasResults
+    ];
+    rqs.forEach(rq => textsToTranslate.push(rq));
+    
+    const translatedResults = await Promise.all(
+      textsToTranslate.map(text => this.translateToEnglish(text))
+    );
+    
+    const studySelection = translatedResults[0];
+    const riskOfBiasResults = translatedResults[1];
+    const translatedRQs = translatedResults.slice(2);
+    
+    console.log(`✅ Results translation completed: ${translatedRQs.length} RQs translated`);
+
+    // Síntesis dinámica por cada RQ utilizando los textos traducidos
+    const synthesisBlocks = [];
+    for (let i = 0; i < rqs.length; i++) {
+        const rqLabel = translatedRQs[i] || `Research Question ${i + 1}`;
+        const synthesis = rqsEntries.length > 0 
+          ? await this.synthesizeRQFindings(i, rqsEntries, prismaContext)
+          : 'No studies were identified that addressed this question.';
+        
+        const rel = rqsStats.rqRelations[`rq${i + 1}`] || { yes: 0, partial: 0 };
+        
+        synthesisBlocks.push(`### 3.4.${i + 1} RQ${i + 1}: ${rqLabel}
+
+Of the ${rqsStats.total} included studies, **${rel.yes} studies** directly addressed this question, while **${rel.partial} additional studies** addressed it partially.
+
+${synthesis}`);
+    }
+    
+    const rqSyntheticFindings = synthesisBlocks.join('\n\n');
 
     // Calcular correctamente los números PRISMA para evitar valores negativos
     const totalIdentified = prismaContext.screening.identified || 0;
@@ -921,7 +932,7 @@ The synthesis was organized around the three research questions, integrating fin
     let synthesisSection = '';
     if (enhancedChartData && enhancedChartData.hasSynthesisData) {
       const summaryTable = this.generateTechnicalSynthesisMarkdownTable(enhancedChartData.technical_synthesis.studies);
-      synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\n${summaryTable}\n*Table 5. Comparative synthesis of quantitative metrics. This table summarizes the empirical evidence reported in each study, enabling direct comparison between different approaches and methodologies. Note: N/R indicates Not Reported.*\n`;
+      synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\n**Table V: Technical Performance Synthesis Matrix**\n\n${summaryTable}\n*Note: N/R indicates Not Reported.*\n`;
     } else if (enhancedChartData && !enhancedChartData.hasSynthesisData) {
       synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\nDirect quantitative comparison of technical performance could not be performed due to the lack of standardized metrics across the included studies. Future research should prioritize standardizing reporting metrics for this domain.\n`;
     }
@@ -963,27 +974,13 @@ ${charts.quality_assessment ? `\n![Quality Assessment Results](${charts.quality_
 
 ## 3.4 Synthesis of Results by Research Question
 
-### 3.4.1 RQ1: ${rq1Label}
+The following subsections synthesize the evidence extracted from the primary studies to address the defined research questions.
 
-Of the ${rqsStats.total} included studies, **${rqsStats.rqRelations.rq1.yes} studies** directly addressed this question, while **${rqsStats.rqRelations.rq1.partial} additional studies** addressed it partially.
-
-${rq1Synthesis}
-
-### 3.4.2 RQ2: ${rq2Label}
-
-For the second research question, **${rqsStats.rqRelations.rq2.yes} studies** provided direct evidence, and **${rqsStats.rqRelations.rq2.partial} studies** provided partial evidence.
-
-${rq2Synthesis}
-
-### 3.4.3 RQ3: ${rq3Label}
-
-Regarding the third question, **${rqsStats.rqRelations.rq3.yes} studies** contributed relevant data directly, while **${rqsStats.rqRelations.rq3.partial} studies** contributed partially.
-
-${rq3Synthesis}
+${rqSyntheticFindings}
 
 The comprehensive synthesis of technical findings and performance metrics across all included studies is consolidated in Table II.
 
-${this.generateTable2Professional(enhancedChartData.technical_synthesis.studies)}
+${this.generateTable2Professional(rqsEntries, prismaContext.protocol || {})}
 
 ${bubbleSection}
 
@@ -992,49 +989,7 @@ ${synthesisSection}
 ${keywordSection}`;
   }
 
-  /**
-   * Table I: Summary of Included Articles (Characteristics)
-   */
-  generateTable1Professional(rqsEntries) {
-    return `
-**Table I. Summary of included articles and study characteristics**
 
-| ID | Author (Year) | Study Type | Context | Technology/Approach |
-|----|---------------|------------|---------|---------------------|
-${rqsEntries.map((e, i) => `| [${i + 1}] | ${e.author} (${e.year}) | ${e.studyType || 'N/A'} | ${e.context || 'N/A'} | ${e.technology || 'N/A'} |`).join('\n')}
-`;
-  }
-
-  /**
-   * Table II: Matrix of Findings and Metrics (Synthesis)
-   */
-  generateTable2Professional(studiesArray) {
-    if (!studiesArray || studiesArray.length === 0) return '';
-    
-    // Extraer todas las columnas únicas
-    const allColsSet = new Set(['study', 'tool']);
-    studiesArray.forEach(study => {
-      Object.keys(study).forEach(k => {
-        if (k !== 'study' && k !== 'tool' && study[k] !== null && study[k] !== undefined && study[k] !== '') {
-          allColsSet.add(k);
-        }
-      });
-    });
-    
-    const displayCols = Array.from(allColsSet);
-    const colLabels = displayCols.map(col => col === 'study' ? 'ID' : (col === 'tool' ? 'Tool' : col.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())));
-
-    let table = `\n**Table II. Synthesis of technical findings and reported performance metrics**\n\n`;
-    table += `| ${colLabels.join(' | ')} |\n`;
-    table += `| ${displayCols.map(() => '---').join(' | ')} |\n`;
-    
-    studiesArray.forEach(study => {
-      const row = displayCols.map(col => study[col] || 'N/R');
-      table += `| ${row.join(' | ')} |\n`;
-    });
-    
-    return table;
-  }
 
   /**
    * Generar Tabla Markdown para Síntesis Técnica (Dinámica)
@@ -1096,15 +1051,16 @@ Most studied technologies (top 5):
 ${rqsStats.technologies.slice(0, 5).map((t, i) => `${i + 1}. ${t.technology}: n=${t.count} (${((t.count / rqsStats.total) * 100).toFixed(1)}%)`).join('\n')}
 
 Research question coverage:
-- RQ1: ${rqsStats.rqRelations.rq1.yes} direct (${((rqsStats.rqRelations.rq1.yes / rqsStats.total) * 100).toFixed(1)}%), ${rqsStats.rqRelations.rq1.partial} partial (${((rqsStats.rqRelations.rq1.partial / rqsStats.total) * 100).toFixed(1)}%)
-- RQ2: ${rqsStats.rqRelations.rq2.yes} direct (${((rqsStats.rqRelations.rq2.yes / rqsStats.total) * 100).toFixed(1)}%), ${rqsStats.rqRelations.rq2.partial} partial (${((rqsStats.rqRelations.rq2.partial / rqsStats.total) * 100).toFixed(1)}%)
-- RQ3: ${rqsStats.rqRelations.rq3.yes} direct (${((rqsStats.rqRelations.rq3.yes / rqsStats.total) * 100).toFixed(1)}%), ${rqsStats.rqRelations.rq3.partial} partial (${((rqsStats.rqRelations.rq3.partial / rqsStats.total) * 100).toFixed(1)}%)
+${Object.keys(rqsStats.rqRelations).map((rqKey, i) => {
+  const rel = rqsStats.rqRelations[rqKey];
+  return `- ${rqKey.toUpperCase()}: ${rel.yes} direct (${((rel.yes / rqsStats.total) * 100).toFixed(1)}%), ${rel.partial} partial (${((rel.partial / rqsStats.total) * 100).toFixed(1)}%)`;
+}).join('\n')}
 
 **WRITING INSTRUCTIONS:**
 
 Generate 2-3 academic paragraphs (400-500 words total) that:
 
-1. **Paragraph 1**: Describe the distribution of study types and contexts, highlighting the predominant ones. Use the exact percentages provided. Reference Table 2 for details.
+1. **Paragraph 1**: Describe the distribution of study types and contexts, highlighting the predominant ones. Use the exact percentages provided. Reference Table II for details.
 
 2. **Paragraph 2**: Analyze the temporal distribution (reference Figure 3) and most studied technologies. Mention exact frequencies and reflect on what this concentration indicates. Discuss whether the temporal pattern shows increasing research interest, maturity of the field, or specific technology adoption waves.
 
@@ -1144,15 +1100,18 @@ ${this.generateTable2Professional(rqsEntries)}`;
   /**
    * Sintetizar hallazgos para RQ1
    */
-  async synthesizeRQ1Findings(rqsEntries, prismaContext) {
+  async synthesizeRQFindings(rqIndex, rqsEntries, prismaContext) {
+    const rqKey = `rq${rqIndex + 1}Relation`;
     const relevantStudies = rqsEntries.map((e, index) => ({...e, globalIndex: index + 1}))
-      .filter(e => e.rq1Relation === 'yes' || e.rq1Relation === 'partial');
+      .filter(e => e[rqKey] === 'yes' || e[rqKey] === 'partial');
 
     if (relevantStudies.length === 0) {
       return "No studies were identified that directly addressed this research question.";
     }
 
-    const prompt = `Synthesize the findings of ${relevantStudies.length} studies that answered: "${prismaContext.protocol.researchQuestions[0]}"
+    const researchQuestion = (prismaContext.protocol.researchQuestions || [])[rqIndex] || `RQ${rqIndex + 1}`;
+
+    const prompt = `Synthesize the findings of ${relevantStudies.length} studies that answered: "${researchQuestion}"
 
 **⚠️ CRITICAL: You are ONLY allowed to mention these ${relevantStudies.length} studies. DO NOT invent or add any studies beyond this list:**
 
@@ -1164,13 +1123,13 @@ Study [${study.globalIndex}] (${study.author}, ${study.year}):
 - Context: ${study.context}
 - Key evidence: ${study.keyEvidence}
 - Metrics: ${JSON.stringify(study.metrics || {})}
-- Relation with RQ1: ${study.rq1Relation}
+- Relation with RQ${rqIndex + 1}: ${study[rqKey]}
 `).join('\n')}
 
 **QUANTITATIVE SUMMARY:**
-- Total studies addressing RQ1: ${relevantStudies.length}
-- Direct relation: ${relevantStudies.filter(s => s.rq1Relation === 'yes').length}
-- Partial relation: ${relevantStudies.filter(s => s.rq1Relation === 'partial').length}
+- Total studies addressing RQ${rqIndex + 1}: ${relevantStudies.length}
+- Direct relation: ${relevantStudies.filter(s => s[rqKey] === 'yes').length}
+- Partial relation: ${relevantStudies.filter(s => s[rqKey] === 'partial').length}
 - Technologies mentioned: ${[...new Set(relevantStudies.map(s => s.technology).filter(t => t))].join(', ')}
 
 **INSTRUCTIONS:**
@@ -1211,138 +1170,6 @@ Respond with paragraphs only (no section headers):`;
   }
 
   /**
-   * Sintetizar hallazgos para RQ2
-   */
-  async synthesizeRQ2Findings(rqsEntries, prismaContext) {
-    const relevantStudies = rqsEntries.map((e, index) => ({...e, globalIndex: index + 1}))
-      .filter(e => e.rq2Relation === 'yes' || e.rq2Relation === 'partial');
-
-    if (relevantStudies.length === 0) {
-      return "No studies were identified that directly addressed this research question.";
-    }
-
-    const prompt = `Synthesize the findings of ${relevantStudies.length} studies for: "${prismaContext.protocol.researchQuestions[1]}"
-
-**⚠️ CRITICAL: You have EXACTLY ${relevantStudies.length} study/studies. DO NOT mention more.**
-**The ONLY valid citations are IEEE format: ${relevantStudies.map(s => `[${s.globalIndex}]`).join(', ')}**
-
-**EVIDENCE:**
-${relevantStudies.map((study) => `
-Study [${study.globalIndex}] (${study.author}, ${study.year}):
-- Key evidence: ${study.keyEvidence}
-- Technology: ${study.technology}
-- Context: ${study.context}
-- Study type: ${study.studyType}
-- Metrics: ${JSON.stringify(study.metrics || {})}
-- Relation: ${study.rq2Relation}
-`).join('\n')}
-
-**QUANTITATIVE SUMMARY:**
-- Studies addressing RQ2: ${relevantStudies.length}
-- Contexts represented: ${[...new Set(relevantStudies.map(s => s.context).filter(c => c))].join(', ')}
-- Study types: ${[...new Set(relevantStudies.map(s => s.studyType).filter(t => t))].join(', ')}
-
-**INSTRUCTIONS:**
-Generate 2-3 academic paragraphs (400-500 words) that:
-
-1. **Quantitative overview**: State how many studies addressed this question and their distribution by context/type
-
-2. **Evidence synthesis**: Organize findings by:
-   - Performance comparisons (if metrics available - reference Table 5 for technical synthesis)
-   - Implementation approaches across different contexts
-   - Advantages/disadvantages identified in the literature
-   - Empirical vs. theoretical findings
-
-3. **Critical analysis**: Identify consensus areas vs. gaps. Mention if certain contexts are underrepresented.
-
-**REQUIREMENTS - STRICT VALIDATION:**
-- Use ONLY IEEE study citations: ("...demonstrated in [${relevantStudies[0].globalIndex}]${relevantStudies.length > 1 ? ` and [${relevantStudies[1].globalIndex}]` : ''}")
-- Include ONLY quantitative data explicitly provided in EVIDENCE section
-- DO NOT invent information, metrics, or findings
-- DO NOT include personal opinions or value judgments — report data ONLY
-- Avoid evaluative language like "interesting", "noteworthy", "importantly"
-- Factual reporting: describe what each study found, not what you think about it
-- Translate Spanish content naturally to English
-- Third person impersonal, formal Academic English
-
-Respond with paragraphs only:`;
-
-    const response = await this.aiService.generateText(
-      this.getEnhancedSystemPrompt(),
-      prompt,
-      'chatgpt'
-    );
-
-    return response.trim();
-  }
-
-  /**
-   * Sintetizar hallazgos para RQ3
-   */
-  async synthesizeRQ3Findings(rqsEntries, prismaContext) {
-    const relevantStudies = rqsEntries.map((e, index) => ({...e, globalIndex: index + 1}))
-      .filter(e => e.rq3Relation === 'yes' || e.rq3Relation === 'partial');
-
-    if (relevantStudies.length === 0) {
-      return "No studies were identified that directly addressed this research question.";
-    }
-
-    const prompt = `Synthesize the findings of ${relevantStudies.length} studies for: "${prismaContext.protocol.researchQuestions[2]}"
-
-**⚠️ CRITICAL: You have EXACTLY ${relevantStudies.length} study/studies. DO NOT invent additional studies.**
-**The ONLY valid citations are IEEE format: ${relevantStudies.map(s => `[${s.globalIndex}]`).join(', ')}**
-
-**EVIDENCE:**
-${relevantStudies.map((study) => `
-Study [${study.globalIndex}] (${study.author}, ${study.year}):
-- Key evidence: ${study.keyEvidence}
-- Limitations: ${study.limitations}
-- Technology: ${study.technology}
-- Quality score: ${study.qualityScore}
-- Metrics: ${JSON.stringify(study.metrics || {})}
-`).join('\n')}
-
-**QUANTITATIVE SUMMARY:**
-- Studies addressing RQ3: ${relevantStudies.length}
-- Quality distribution: ${relevantStudies.filter(s => s.qualityScore === 'high').length} high, ${relevantStudies.filter(s => s.qualityScore === 'medium').length} medium, ${relevantStudies.filter(s => s.qualityScore === 'low').length} low
-
-**INSTRUCTIONS:**
-Generate 2-3 academic paragraphs (400-500 words) that:
-
-1. **Evidence overview**: Present the number of studies and their quality distribution (reference Figure 4 for quality assessment)
-
-2. **Findings synthesis**: Organize by:
-   - Main insights from high-quality studies (prioritize these)
-   - Complementary evidence from medium-quality studies
-   - Identification of research trends and emerging patterns
-   - Acknowledged limitations and their implications
-
-3. **Critical discussion**: Analyze the strength of evidence. Mention if certain aspects are well-supported vs. under-researched.
-
-**REQUIREMENTS - NO HALLUCINATIONS:**
-- Use ONLY IEEE study citations: ("...identified in [${relevantStudies[0].globalIndex}]${relevantStudies.length > 1 ? ` and [${relevantStudies[1].globalIndex}]` : ''}")
-- Prioritize evidence from high-quality studies
-- Include ONLY quantitative data explicitly provided above
-- Acknowledge limitations transparently
-- DO NOT invent data, studies, or findings
-- DO NOT include personal opinions or value judgments — report data ONLY
-- Avoid evaluative language: "interesting", "noteworthy", "remarkably"
-- Factual synthesis only: what each study reported, not your interpretation
-- Translate Spanish content to English naturally
-- Third person impersonal, formal Academic English
-
-Respond with paragraphs only:`;
-
-    const response = await this.aiService.generateText(
-      this.getEnhancedSystemPrompt(),
-      prompt,
-      'chatgpt'
-    );
-
-    return response.trim();
-  }
-
-  /**
    * TABLAS PROFESIONALES bien formateadas
    */
   generateTable1Professional(rqsEntries) {
@@ -1363,17 +1190,21 @@ ${rqsEntries.map((entry, i) => {
 `;
   }
 
-  generateTable2Professional(rqsEntries) {
+  generateTable2Professional(rqsEntries, protocol = {}) {
+    const researchQuestions = protocol.researchQuestions || ['RQ1', 'RQ2', 'RQ3'];
+    const rqHeaders = researchQuestions.map((_, i) => `RQ${i + 1}`).join(' | ');
+    const rqSubHeaders = researchQuestions.map(() => '---').join('|');
+
     return `
 **Table II. Synthesis of main results and reported technical metrics**
 
-| ID | Key Evidence | Main Metrics | RQ1 | RQ2 | RQ3 | Quality |
-|----|----------------|---------------------|-----|-----|-----|---------|
+| ID | Key Evidence | Main Metrics | ${rqHeaders} | Quality |
+|----|----------------|---------------------|${rqSubHeaders}|---------|
 ${rqsEntries.map((entry, i) => {
       const id = `[${i + 1}]`;
       const evidence = (entry.keyEvidence || 'Not reported').substring(0, 60) + '...';
 
-      // Metrics - filtrar valores null, Unknown, N/A
+      // Metrics
       let metrics = 'N/R';
       if (entry.metrics && Object.keys(entry.metrics).length > 0) {
         const validMetrics = Object.entries(entry.metrics)
@@ -1390,13 +1221,14 @@ ${rqsEntries.map((entry, i) => {
         if (relation === 'partial') return '○';
         return '✗';
       };
-      const rq1 = getRQSymbol(entry.rq1Relation);
-      const rq2 = getRQSymbol(entry.rq2Relation);
-      const rq3 = getRQSymbol(entry.rq3Relation);
+      
+      const rqRelationSymbols = researchQuestions.map((_, j) => {
+        return getRQSymbol(entry[`rq${j + 1}Relation`]);
+      }).join(' | ');
 
       const quality = this.translateQuality(entry.qualityScore);
 
-      return `| ${id} | ${evidence} | ${metrics} | ${rq1} | ${rq2} | ${rq3} | ${quality} |`;
+      return `| ${id} | ${evidence} | ${metrics} | ${rqRelationSymbols} | ${quality} |`;
     }).join('\n')}
 
 *Legend: ✓ = Direct relation, ○ = Partial relation, ✗ = No direct relation*
@@ -1478,9 +1310,10 @@ General data:
 - Dominant technologies: ${rqsStats.technologies.slice(0, 3).map(t => t.technology).join(', ')}
 
 RQ Coverage:
-- RQ1: ${rqsStats.rqRelations.rq1.yes + rqsStats.rqRelations.rq1.partial} studies
-- RQ2: ${rqsStats.rqRelations.rq2.yes + rqsStats.rqRelations.rq2.partial} studies
-- RQ3: ${rqsStats.rqRelations.rq3.yes + rqsStats.rqRelations.rq3.partial} studies
+${Object.keys(rqsStats.rqRelations).map((rqKey, i) => {
+  const rel = rqsStats.rqRelations[rqKey];
+  return `- ${rqKey.toUpperCase()}: ${rel.yes + rel.partial} studies (${rel.yes} direct, ${rel.partial} partial)`;
+}).join('\n')}
 
 Base PRISMA interpretation:
 ${prismaMapping.discussion.interpretation}
@@ -1571,9 +1404,10 @@ Key review data:
 - Study types: ${Object.entries(rqsStats.studyTypes).map(([type, count]) => `${type} (${count})`).join(', ')}
 
 RQ Coverage:
-- RQ1: ${rqsStats.rqRelations.rq1.yes} direct + ${rqsStats.rqRelations.rq1.partial} partial = ${rqsStats.rqRelations.rq1.yes + rqsStats.rqRelations.rq1.partial} relevant studies
-- RQ2: ${rqsStats.rqRelations.rq2.yes} direct + ${rqsStats.rqRelations.rq2.partial} partial = ${rqsStats.rqRelations.rq2.yes + rqsStats.rqRelations.rq2.partial} relevant studies
-- RQ3: ${rqsStats.rqRelations.rq3.yes} direct + ${rqsStats.rqRelations.rq3.partial} partial = ${rqsStats.rqRelations.rq3.yes + rqsStats.rqRelations.rq3.partial} relevant studies
+${Object.keys(rqsStats.rqRelations).map((rqKey, i) => {
+  const rel = rqsStats.rqRelations[rqKey];
+  return `- ${rqKey.toUpperCase()}: ${rel.yes} direct + ${rel.partial} partial = ${rel.yes + rel.partial} relevant studies`;
+}).join('\n')}
 
 **REQUIRED STRUCTURE (500-800 words — 5-10% of total article):**
 
@@ -1582,9 +1416,10 @@ The Conclusions section must be structured as direct answers to the research que
 **4.1 Answers to Research Questions (150-200 words)**
 For EACH research question, provide a direct, quantitative answer. Use this structure:
 
-"**RQ1 Answer**: [Clear answer with key findings and numbers]. Of the ${rqsStats.total} included studies, ${rqsStats.rqRelations.rq1.yes + rqsStats.rqRelations.rq1.partial} addressed this question, revealing that [main finding with specific data/technology/metric]."
-
-[Repeat for RQ2 and RQ3 with their respective numbers]
+"${Object.keys(rqsStats.rqRelations).map((rqKey, i) => {
+  const rel = rqsStats.rqRelations[rqKey];
+  return `**${rqKey.toUpperCase()} Answer**: [Clear answer with key findings and numbers]. Of the ${rqsStats.total} included studies, ${rel.yes + rel.partial} addressed this question, revealing that [main finding with specific data/technology/metric].`;
+}).join('\n\n')}"
 
 **4.2 Principal Contribution (100-150 words)**
 State the single most significant technical finding from this review. Use this structure:
@@ -1713,7 +1548,9 @@ The authors declare that the PRISMA 2020 guidelines have been strictly followed 
   /**
    * Calcular estadísticas DETALLADAS de RQS con porcentajes y distribuciones
    */
-  calculateDetailedRQSStatistics(rqsEntries) {
+  calculateDetailedRQSStatistics(rqsEntries, protocol = {}) {
+    const researchQuestions = protocol.researchQuestions || ['RQ1', 'RQ2', 'RQ3'];
+    
     const stats = {
       total: rqsEntries.length,
       studyTypes: {},
@@ -1721,17 +1558,18 @@ The authors declare that the PRISMA 2020 guidelines have been strictly followed 
       technologies: [],
       yearRange: { min: Infinity, max: -Infinity },
       yearDistribution: {},
-      rqRelations: {
-        rq1: { yes: 0, no: 0, partial: 0 },
-        rq2: { yes: 0, no: 0, partial: 0 },
-        rq3: { yes: 0, no: 0, partial: 0 }
-      },
+      rqRelations: {},
       qualityDistribution: {
         high: 0,
         medium: 0,
         low: 0
       }
     };
+
+    // Inicializar rqRelations dinámicamente
+    researchQuestions.forEach((_, i) => {
+      stats.rqRelations[`rq${i + 1}`] = { yes: 0, no: 0, partial: 0 };
+    });
 
     const techCount = {};
 
@@ -1759,16 +1597,14 @@ The authors declare that the PRISMA 2020 guidelines have been strictly followed 
         stats.yearDistribution[year] = (stats.yearDistribution[year] || 0) + 1;
       }
 
-      // Relación con RQs
-      if (entry.rq1Relation) {
-        stats.rqRelations.rq1[entry.rq1Relation]++;
-      }
-      if (entry.rq2Relation) {
-        stats.rqRelations.rq2[entry.rq2Relation]++;
-      }
-      if (entry.rq3Relation) {
-        stats.rqRelations.rq3[entry.rq3Relation]++;
-      }
+      // Relación con RQs - Dinámico
+      researchQuestions.forEach((_, i) => {
+        const rqKey = `rq${i + 1}`;
+        const entryKey = `rq${i + 1}Relation`;
+        if (entry[entryKey]) {
+          stats.rqRelations[rqKey][entry[entryKey]]++;
+        }
+      });
 
       // Calidad
       const quality = entry.qualityScore || 'medium';
@@ -2011,7 +1847,7 @@ The authors declare that the PRISMA 2020 guidelines have been strictly followed 
   /**
    * Validar calidad del artículo generado según estándares editoriales universales
    */
-  validateArticleQuality(article) {
+  validateArticleQuality(article, protocol = {}) {
     const errors = [];
     const warnings = [];
     const { 
@@ -2112,8 +1948,15 @@ The authors declare that the PRISMA 2020 guidelines have been strictly followed 
     }
 
     // Validar que Introduction termina con RQs
-    if (article.introduction && !article.introduction.includes('RQ1') && !article.introduction.includes('RQ 1')) {
-      warnings.push('Introduction no termina con lista explícita de Research Questions');
+    const researchQuestions = protocol.researchQuestions || [];
+    const missingRQs = researchQuestions.filter((rq, i) => {
+        const rqTag = `RQ${i + 1}`;
+        const rqTagAlt = `RQ ${i + 1}`;
+        return !article.introduction.includes(rqTag) && !article.introduction.includes(rqTagAlt);
+    });
+
+    if (article.introduction && missingRQs.length > 0) {
+      warnings.push(`Introduction no termina con lista explícita de RQs: faltan ${missingRQs.join(', ')}`);
     }
 
     // Validar word count mínimo total

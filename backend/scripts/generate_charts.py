@@ -12,9 +12,10 @@ import numpy as np
 import argparse
 
 # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Estilo acadÃƒÂ©mico global (similar a revistas cientÃƒÂ­ficas) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+# --- Global Academic Style (Scientific Journal Quality) ---
 plt.rcParams.update({
     'font.family': 'serif',
-    'font.serif': ['Times New Roman', 'DejaVu Serif', 'Georgia', 'serif'],
+    'font.serif': ['DejaVu Serif', 'Times New Roman', 'Georgia', 'serif'],
     'font.size': 10,
     'axes.titlesize': 12,
     'axes.labelsize': 11,
@@ -23,11 +24,19 @@ plt.rcParams.update({
     'legend.fontsize': 9,
     'figure.dpi': 300,
     'savefig.dpi': 300,
-    'axes.linewidth': 0.8,
+    'axes.linewidth': 1.0,
     'grid.linewidth': 0.5,
-    'lines.linewidth': 1.2,
-    'lines.markersize': 5,
+    'lines.linewidth': 1.5,
+    'lines.markersize': 6,
 })
+
+# Professional Academic Palette
+SCIENTIFIC_BLUE = '#2c3e50'
+SCIENTIFIC_GRAY = '#34495e'
+SCIENTIFIC_ACCENT = '#3498db'
+SCIENTIFIC_SUCCESS = '#27ae60'
+SCIENTIFIC_WARNING = '#f39c12'
+SCIENTIFIC_DANGER = '#c0392b'
 
 def ensure_dir(directory):
     if not os.path.exists(directory):
@@ -53,62 +62,58 @@ def save_figure(fig, output_path, **kwargs):
 
 def draw_prisma(data, output_path):
     """
-    PRISMA 2020 Flow Diagram — Pixel-perfect match to standard template.
+    PRISMA 2020 Flow Diagram — Pixel-perfect match to provided template.
+    Uses exact colors: Header (#ffb732), Phase labels (#c6dbf7), and sharp black borders.
     """
-    fig, ax = plt.subplots(figsize=(10, 10))
+    fig, ax = plt.subplots(figsize=(12, 12))
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
     ax.axis('off')
 
-    # PRISMA 2020 EXACT Colors (Black and White standard)
-    HEADER_BG = '#ffffff'
-    PHASE_BG = '#ffffff'
-    BOX_BG = '#ffffff'
+    # PRISMA 2020 Colors from Image
+    HEADER_BG = '#ffb732' # Yellow
+    PHASE_BG = '#c6dbf7'  # Light Blue
+    BOX_BG = '#ffffff'    # White
     BOX_EDGE = '#000000'
     ARROW_COLOR = '#000000'
 
-    # Font dictionary to mimic official Arial/Helvetica closely
+    # Font dictionary
     font_kwargs = {'family': 'sans-serif', 'fontname': 'Arial', 'color': '#000000'}
 
-    def draw_box(x, y, w, h, text, bg_color=BOX_BG, fontsize=9.5, edge_lw=1.0, align='center'):
-        rect = FancyBboxPatch((x, y - h), w, h, boxstyle="square,pad=0",
-                              linewidth=edge_lw, edgecolor=BOX_EDGE, facecolor=bg_color)
+    def draw_box(x, y, w, h, text, bg_color=BOX_BG, fontsize=10, edge_lw=1.2, align='center', rounded=False):
+        boxstyle = "round,pad=0.3,rounding_size=0.5" if rounded else "square,pad=0"
+        rect = FancyBboxPatch((x, y - h), w, h, boxstyle=boxstyle,
+                              linewidth=edge_lw, edgecolor=BOX_EDGE, facecolor=bg_color, mutation_scale=1.0)
         ax.add_patch(rect)
         
-        # Helper string wrapping and alignment
+        # Text wrapping and vertical centering
         lines = text.split('\n')
-        line_spacing = fontsize * 0.35 + 0.5
-        total_text_height = len(lines) * line_spacing
-        start_y = (y - h/2) + total_text_height/2 - line_spacing/2
+        # Adjust line spacing for better readability
+        v_spacing = h / (len(lines) + 1)
         
         for i, line in enumerate(lines):
-            align_x = x + w/2 if align == 'center' else x + 2
+            align_x = x + w/2 if align == 'center' else x + 1.5
             ha = 'center' if align == 'center' else 'left'
-            ax.text(align_x, start_y - i * line_spacing, line, ha=ha, va='center',
+            ax.text(align_x, y - (i + 1) * v_spacing, line, ha=ha, va='center',
                     fontsize=fontsize, **font_kwargs)
 
-    def draw_rounded_header(x, y, w, h, text, bg=HEADER_BG):
-        # PRISMA does not use rounded headers for the main top box usually, but we keep it flat if possible
-        rect = FancyBboxPatch((x, y - h), w, h, boxstyle="square,pad=0",
-                              linewidth=1.0, edgecolor=BOX_EDGE, facecolor=bg)
+    def draw_side_label(x, y, w, h, text):
+        # Blue rotated side labels
+        rect = FancyBboxPatch((x, y - h), w, h, boxstyle="round,pad=0.3,rounding_size=1.0",
+                              linewidth=1.2, edgecolor=BOX_EDGE, facecolor=PHASE_BG)
         ax.add_patch(rect)
         ax.text(x + w/2, y - h/2, text, ha='center', va='center',
-                fontsize=10.5, fontweight='bold', **font_kwargs)
+                fontsize=11, fontweight='bold', rotation=90, **font_kwargs)
 
-    def draw_phase(x, y, w, h, label):
-        # The phase is a text on the far left without a box bounding it
-        # Actually PRISMA template usually has just horizontal lines separating phases, or rotated text
-        ax.text(x + w/2, y - h/2, label.upper(), ha='center', va='center',
-                fontsize=11.5, fontweight='bold', rotation=90, **font_kwargs)
-
-    def draw_arrow(x1, y1, x2, y2):
-        # Standard flat arrow
+    def draw_arrow(x1, y1, x2, y2, connectionstyle="arc3,rad=0"):
+        # Sharp arrows matching the template
         ax.annotate("", xy=(x2, y2), xytext=(x1, y1),
-                    arrowprops=dict(arrowstyle="-|>", color=ARROW_COLOR, lw=1.2, mutation_scale=10))
+                    arrowprops=dict(arrowstyle="-|>", color=ARROW_COLOR, lw=1.5, 
+                                  mutation_scale=15, shrinkA=0, shrinkB=0,
+                                  connectionstyle=connectionstyle))
 
-    # Data Extract
+    # Data Extraction
     identified = data.get('identified', 0)
-    databases = data.get('databases', [])
     duplicates = data.get('duplicates', 0)
     screened = data.get('screened', 0)
     excluded = data.get('excluded', 0)
@@ -117,91 +122,106 @@ def draw_prisma(data, output_path):
     assessed = data.get('assessed', 0)
     excluded_reasons = data.get('excluded_reasons', {})
     included = data.get('included', 0)
-    excluded_fulltext = data.get('excluded_fulltext', max(0, assessed - included))
+    
+    # Calculate excluded fulltext accurately
+    excluded_fulltext = max(0, assessed - included)
 
-    # --- PIXEL PERFECT LAYOUT (Top-Left Coordinates) ---
-    TOP_Y = 96
-    
-    PHASE_X = 1
-    PHASE_W = 6
-    
-    MAIN_X = 9
+    # --- PIXEL PERFECT LAYOUT ---
+    TOP_Y = 95
+    MAIN_X = 15
     MAIN_W = 38
     MAIN_CENTER = MAIN_X + MAIN_W / 2
     
-    SIDE_X = 54
-    SIDE_W = 44
+    SIDE_X = 58
+    SIDE_W = 38
     
-    GAP_Y = 6
+    LABEL_X = 7
+    LABEL_W = 5
+    
+    GAP_Y = 7
     BOX_H = 10
 
-    # 1. HEADER
-    draw_rounded_header(MAIN_X, TOP_Y, SIDE_X+SIDE_W-MAIN_X, 4, 'Identification of new studies via databases and registers')
-    
-    # Draw horizontal phase lines (Official PRISMA uses these to segment the left column)
-    # ax.plot([0, 100], [TOP_Y - 4 - 2, TOP_Y - 4 - 2], color="black", lw=1.0)
+    # 1. TOP HEADER (YELLOW ROUNDED)
+    draw_box(MAIN_X, TOP_Y, (SIDE_X + SIDE_W) - MAIN_X, 5, 
+             'New studies identified via databases/registers', 
+             bg_color=HEADER_BG, align='center', fontsize=12, rounded=True)
     
     # 2. IDENTIFICATION
-    id_y = TOP_Y - 6
-    id_h = BOX_H + 2
-    id_text = f"Records identified from:\nDatabases (n = {identified})\nRegisters (n = 0)"
-    draw_box(MAIN_X, id_y, MAIN_W, id_h, id_text, align='left')
+    id_y = TOP_Y - 8
+    id_h = 12
+    draw_box(MAIN_X, id_y, MAIN_W, id_h, 
+             f"Records identified:\nDatabases (n = {identified})\nRegisters (n = 0)", 
+             align='center')
     
-    id_side_text = f"Records removed before screening:\nDuplicate records removed\n(n = {duplicates})\nRecords marked as ineligible\nby automation tools (n = 0)\nRecords removed for other\nreasons (n = 0)"
-    draw_box(SIDE_X, id_y, SIDE_W, id_h, id_side_text, align='left')
+    draw_box(SIDE_X, id_y, SIDE_W, id_h, 
+             f"Removed before screening:\nDuplicates (n = {duplicates})\nIneligible by AI (n = 0)\nOther reasons (n = 0)", 
+             align='center')
     
     draw_arrow(MAIN_X + MAIN_W, id_y - id_h/2, SIDE_X, id_y - id_h/2)
-    draw_phase(PHASE_X, id_y, PHASE_W, id_h, "Identification")
+    draw_side_label(LABEL_X, id_y, LABEL_W, id_h, "Identification")
     
-    draw_arrow(MAIN_CENTER, id_y - id_h, MAIN_CENTER, id_y - id_h - GAP_Y)
+    # Arrow to Screened
+    next_y = id_y - id_h - GAP_Y
+    draw_arrow(MAIN_CENTER, id_y - id_h, MAIN_CENTER, next_y)
 
-    # 3. SCREENING - Part 1
-    scr_y = id_y - id_h - GAP_Y
-    scr_h = BOX_H - 2
-    draw_box(MAIN_X, scr_y, MAIN_W, scr_h, f"Records screened\n(n = {screened})", align='left')
-    draw_box(SIDE_X, scr_y, SIDE_W, scr_h, f"Records excluded\n(n = {excluded})", align='left')
+    # 3. SCREENED
+    scr_y = next_y
+    scr_h = 7
+    draw_box(MAIN_X, scr_y, MAIN_W, scr_h, f"Records screened\n(n = {screened})")
+    draw_box(SIDE_X, scr_y, SIDE_W, scr_h, f"Records excluded\n(n = {excluded})")
     draw_arrow(MAIN_X + MAIN_W, scr_y - scr_h/2, SIDE_X, scr_y - scr_h/2)
-    draw_arrow(MAIN_CENTER, scr_y - scr_h, MAIN_CENTER, scr_y - scr_h - GAP_Y)
-
-    # 4. RETRIEVAL - Part 2
-    retr_y = scr_y - scr_h - GAP_Y
-    retr_h = BOX_H - 2
-    draw_box(MAIN_X, retr_y, MAIN_W, retr_h, f"Reports sought for retrieval\n(n = {retrieved})", align='left')
-    draw_box(SIDE_X, retr_y, SIDE_W, retr_h, f"Reports not retrieved\n(n = {not_retrieved})", align='left')
-    draw_arrow(MAIN_X + MAIN_W, retr_y - retr_h/2, SIDE_X, retr_y - retr_h/2)
-    draw_arrow(MAIN_CENTER, retr_y - retr_h, MAIN_CENTER, retr_y - retr_h - GAP_Y)
-
-    # 5. ELIGIBILITY - Part 3
-    elig_y = retr_y - retr_h - GAP_Y
-    elig_h = BOX_H + 4
-    draw_box(MAIN_X, elig_y, MAIN_W, elig_h, f"Reports assessed for eligibility\n(n = {assessed})", align='left')
     
-    exc_lines = [f"Reports excluded:"]
-    if excluded_reasons and len(excluded_reasons) > 0:
-        for reason, count in excluded_reasons.items():
-            exc_lines.append(f"  {reason[:30]} (n = {count})")
-    else:
-        exc_lines.append(f"  Reason 1 (n = {max(0, excluded_fulltext - 0)})")
-        exc_lines.append("  Reason 2 (n = 0)")
-        exc_lines.append("  Reason 3 (n = 0)")
-        
-    draw_box(SIDE_X, elig_y, SIDE_W, elig_h, "\n".join(exc_lines), align='left')
-    draw_arrow(MAIN_X + MAIN_W, elig_y - elig_h/2, SIDE_X, elig_y - elig_h/2)
-    draw_arrow(MAIN_CENTER, elig_y - elig_h, MAIN_CENTER, elig_y - elig_h - GAP_Y)
+    # Arrow to Seeked
+    next_y = scr_y - scr_h - GAP_Y
+    draw_arrow(MAIN_CENTER, scr_y - scr_h, MAIN_CENTER, next_y)
 
-    # Add phase text in middle
-    phase_scr_h = (elig_y - scr_y) + elig_h
-    draw_phase(PHASE_X, scr_y, PHASE_W, phase_scr_h, "Screening")
+    # 4. SOUGHT
+    sou_y = next_y
+    sou_h = 7
+    draw_box(MAIN_X, sou_y, MAIN_W, sou_h, f"Reports sought\n(n = {retrieved})")
+    draw_box(SIDE_X, sou_y, SIDE_W, sou_h, f"Reports not retrieved\n(n = {not_retrieved})")
+    draw_arrow(MAIN_X + MAIN_W, sou_y - sou_h/2, SIDE_X, sou_y - sou_h/2)
+    
+    # Arrow to Eligibility
+    next_y = sou_y - sou_h - GAP_Y
+    draw_arrow(MAIN_CENTER, sou_y - sou_h, MAIN_CENTER, next_y)
+
+    # 5. ELIGIBILITY
+    eli_y = next_y
+    eli_h = 12
+    draw_box(MAIN_X, eli_y, MAIN_W, eli_h, f"Assessed for eligibility\n(n = {assessed})")
+    
+    # Reasons for exclusion - COMPACTED to 2-3 terms
+    exc_lines = [f"Excluded (n = {excluded_fulltext}):"]
+    if excluded_reasons:
+        # Take top 3 reasons and compact them
+        for reason, count in list(excluded_reasons.items())[:3]:
+            # Compact reason to max 2 words
+            compact_reason = " ".join(reason.split()[:2])
+            exc_lines.append(f"{compact_reason} (n = {count})")
+    else:
+        exc_lines.append(f"Ineligible (n = {excluded_fulltext})")
+        
+    draw_box(SIDE_X, eli_y, SIDE_W, eli_h, "\n".join(exc_lines))
+    draw_arrow(MAIN_X + MAIN_W, eli_y - eli_h/2, SIDE_X, eli_y - eli_h/2)
+    
+    # Side Label for Screening (covers Screened to Eligibility)
+    draw_side_label(LABEL_X, scr_y, LABEL_W, (scr_y - eli_y) + eli_h, "Screening")
+    
+    # Arrow to Included
+    next_y = eli_y - eli_h - GAP_Y
+    draw_arrow(MAIN_CENTER, eli_y - eli_h, MAIN_CENTER, next_y)
 
     # 6. INCLUDED
-    inc_y = elig_y - elig_h - GAP_Y
-    inc_h = BOX_H + 2
-    draw_box(MAIN_X, inc_y, MAIN_W, inc_h, f"New studies included in review\n(n = {included})\nReports of new included studies\n(n = 0)", align='left')
-    draw_phase(PHASE_X, inc_y, PHASE_W, inc_h, "Included")
+    inc_y = next_y
+    inc_h = 12
+    draw_box(MAIN_X, inc_y, MAIN_W, inc_h, 
+             f"Included in review\n(n = {included})\nPublished reports\n(n = {included})")
+    draw_side_label(LABEL_X, inc_y, LABEL_W, inc_h, "Included")
 
-    # Add outer bounding box (optional but often seen in PRISMA left margin outline)
-    border_rect = patches.Rectangle((PHASE_X + PHASE_W + 1, inc_y - inc_h - 2), 0, (TOP_Y - (inc_y - inc_h - 2)), linewidth=1.5, edgecolor=BOX_EDGE, facecolor='none')
-    ax.add_patch(border_rect)
+    plt.tight_layout()
+    save_figure(fig, output_path)
+    plt.close()
 
     plt.tight_layout(rect=[0, 0, 1, 1])
     save_figure(fig, output_path)
@@ -240,12 +260,14 @@ def draw_scree(data, output_path):
     fig, ax = plt.subplots(figsize=(8, 5))
 
     # â•â•â• Main line plot â•â•â•
-    ax.plot(df['Rank'], df['Score'], 'o-', color='#333333', markersize=4,
-            markerfacecolor='#333333', markeredgecolor='#333333', linewidth=1.2,
+    # Main line plot
+    ax.plot(df['Rank'], df['Score'], 'o-', color=SCIENTIFIC_BLUE, markersize=5,
+            markerfacecolor=SCIENTIFIC_BLUE, markeredgecolor=SCIENTIFIC_BLUE, linewidth=1.5,
             label='Relevance score', zorder=3)
 
     # â•â•â• Fill under curve (very subtle) â•â•â•
-    ax.fill_between(df['Rank'], df['Score'], color='#cccccc', alpha=0.3, zorder=1)
+    # Fill under curve
+    ax.fill_between(df['Rank'], df['Score'], color=SCIENTIFIC_ACCENT, alpha=0.15, zorder=1)
 
     # â•â•â• Median â•â•â•
     median_score = float(df['Score'].median())
@@ -399,7 +421,7 @@ def draw_temporal_distribution(data, output_path):
     fig, ax = plt.subplots(figsize=(10, 6))
     
     # Bar chart
-    bars = ax.bar(years, counts, color='#4a90e2', alpha=0.8, edgecolor='#333333', linewidth=0.8)
+    bars = ax.bar(years, counts, color=SCIENTIFIC_BLUE, alpha=0.85, edgecolor=SCIENTIFIC_GRAY, linewidth=1.0)
     
     # Add value labels on top of bars
     for bar in bars:
@@ -471,14 +493,14 @@ def draw_quality_assessment(data, output_path):
     width = 0.6
     
     # Stacked bars
-    p1 = ax.bar(x, yes_counts, width, label='Yes', color='#27ae60', alpha=0.9, edgecolor='#333333', linewidth=0.5)
+    p1 = ax.bar(x, yes_counts, width, label='Yes', color=SCIENTIFIC_SUCCESS, alpha=0.9, edgecolor=SCIENTIFIC_GRAY, linewidth=0.5)
     p2 = ax.bar(x, partial_counts, width, bottom=yes_counts, label='Partial', 
-                color='#f39c12', alpha=0.9, edgecolor='#333333', linewidth=0.5)
+                color=SCIENTIFIC_WARNING, alpha=0.9, edgecolor=SCIENTIFIC_GRAY, linewidth=0.5)
     
     # Calculate bottom for 'No' bars
     bottom_no = [yes_counts[i] + partial_counts[i] for i in range(len(questions))]
     p3 = ax.bar(x, no_counts, width, bottom=bottom_no, label='No', 
-                color='#e74c3c', alpha=0.9, edgecolor='#333333', linewidth=0.5)
+                color=SCIENTIFIC_DANGER, alpha=0.9, edgecolor=SCIENTIFIC_GRAY, linewidth=0.5)
     
     # Add percentage labels
     total = [yes_counts[i] + partial_counts[i] + no_counts[i] for i in range(len(questions))]
@@ -559,7 +581,8 @@ def draw_bubble_chart(data, output_path):
     colors = []
     
     # Color palette
-    color_palette = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c']
+    color_palette = [SCIENTIFIC_BLUE, SCIENTIFIC_ACCENT, SCIENTIFIC_SUCCESS, 
+                     SCIENTIFIC_WARNING, SCIENTIFIC_DANGER, SCIENTIFIC_GRAY]
     
     for entry in entries:
         if 'metric' in entry and 'tool' in entry and 'studies' in entry:
@@ -726,7 +749,7 @@ def draw_keyword_concentration(data, output_path):
     
     # Horizontal bar chart
     y_pos = np.arange(len(words))
-    bars = ax.barh(y_pos, counts, color='#2c3e50', alpha=0.85, edgecolor='#34495e', linewidth=0.8)
+    bars = ax.barh(y_pos, counts, color=SCIENTIFIC_BLUE, alpha=0.85, edgecolor=SCIENTIFIC_GRAY, linewidth=1.0)
     
     # Add value labels
     for i, v in enumerate(counts):
