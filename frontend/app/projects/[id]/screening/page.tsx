@@ -692,7 +692,7 @@ Total: ${included} incluidas, ${excluded} excluidas${reviewManual > 0 ? `, ${rev
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-semibold">{query.databaseName}</span>
-                        {query.resultCount !== null && (
+                        {typeof query.resultCount === 'number' && (
                           <Badge variant="secondary">
                             {query.resultCount.toLocaleString()} resultados
                           </Badge>
