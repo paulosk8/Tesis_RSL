@@ -38,7 +38,7 @@ function generate(articleData, userProfile = null) {
     country: 'Ecuador'
   } : null;
 
-  return `\\documentclass[12pt,a4paper]{article}
+  return `\\documentclass[conference]{IEEEtran}
 
 % -------------------- PAQUETES BÁSICOS --------------------
 \\usepackage[utf8]{inputenc}
@@ -54,11 +54,6 @@ function generate(articleData, userProfile = null) {
 \\usepackage{hyperref}
 \\usepackage{cite}
 \\usepackage{caption}
-\\usepackage{geometry}
-\\usepackage{setspace}
-
-\\geometry{margin=1in}
-\\onehalfspacing
 
 \\hypersetup{
   colorlinks=true,
@@ -68,14 +63,12 @@ function generate(articleData, userProfile = null) {
 }
 
 % -------------------- TÍTULO --------------------
-\\title{\\textbf{${escapeLatex(articleData.title || 'Systematic Literature Review')}}}
+\\title{${escapeLatex(articleData.title || 'Systematic Literature Review')}}
 
 % -------------------- AUTORES --------------------
 \\author{
 ${generateUniversalAuthors(articleData.authors || (defaultAuthor ? [defaultAuthor] : []))}
 }
-
-\\date{}
 
 \\begin{document}
 
@@ -91,8 +84,9 @@ ${escapeLatex(articleData.abstract || 'This systematic review examines... Follow
 
 % -------------------- KEYWORDS --------------------
 % 📌 3–6 palabras clave (OBLIGATORIO)
-\\textbf{Palabras clave:} ${generateUniversalKeywords(articleData.keywords || [])}
-\\bigskip
+\\begin{IEEEkeywords}
+${generateUniversalKeywords(articleData.keywords || [])}
+\\end{IEEEkeywords}
 
 % -------------------- 1. INTRODUCTION --------------------
 % 📏 800-1000 palabras
@@ -245,26 +239,18 @@ ${generateBibliography(articleData.references || [])}
  */
 function generateUniversalAuthors(authors) {
   if (!Array.isArray(authors) || authors.length === 0) {
-    return `Nombre Apellido$^{1}$\\\\
-{\\small $^{1}$Afiliación institucional, País}\\\\
-{\\small email@institucion.edu}`;
+    return `\\IEEEauthorblockN{Nombre Apellido}
+\\IEEEauthorblockA{\\textit{Afiliación institucional} \\\\
+País \\\\
+email@institucion.edu}`;
   }
 
-  const authorNames = authors.map((author, index) => 
-    `${escapeLatex(author.name)}$^{${index + 1}}$`
-  ).join(', ');
-  
-  const affiliations = authors.map((author, index) => 
-    `{\\small $^{${index + 1}}$${escapeLatex(author.institution || 'Universidad de las Fuerzas Armadas ESPE')}, ${escapeLatex(author.country || 'Ecuador')}}`
-  ).join('\\\\\n');
-  
-  const emails = authors.length > 0 && authors[0].email 
-    ? `{\\small ${authors[0].email}}` 
-    : '{\\small email@institucion.edu}';
-  
-  return `${authorNames}\\\\
-${affiliations}\\\\
-${emails}`;
+  return authors.map((author) => {
+    return `\\IEEEauthorblockN{${escapeLatex(author.name)}}
+\\IEEEauthorblockA{\\textit{${escapeLatex(author.institution || 'Universidad de las Fuerzas Armadas ESPE')}} \\\\
+${escapeLatex(author.city ? author.city + ', ' + author.country : author.country || 'Ecuador')} \\\\
+${escapeLatex(author.email || 'email@institucion.edu')}}`;
+  }).join('\\and ');
 }
 
 /**
@@ -294,9 +280,9 @@ function generateMethodsSection(methodsContent, includeElbowPlot = true) {
 
 Se utilizó un enfoque híbrido de cribado asistido por IA. Las referencias descargadas fueron analizadas semánticamente para generar un puntaje de relevancia (0-1). La Figura~\\ref{fig:codo} muestra la distribución de estos puntajes, permitiendo identificar el punto de inflexión (knee point) óptimo para maximizar la recuperación de estudios relevantes minimizando el esfuerzo de revisión manual.
 
-\\begin{figure}[H]
+\\begin{figure}[!htbp]
 \\centering
-\\includegraphics[width=\\columnwidth]{scree_plot}
+\\includegraphics[width=\\linewidth]{scree_plot}
 \\caption{Distribución visual de puntajes de relevancia ordenados de mayor a menor. La línea vertical indica el punto de inflexión utilizado como criterio de corte para priorizar la revisión manual.}
 \\label{fig:codo}
 \\end{figure}
@@ -340,9 +326,9 @@ Las referencias obtenidas de las bases de datos fueron procesadas mediante un mo
 
 La Figura~\\ref{fig:codo} presenta la distribución de estos puntajes ordenados de mayor a menor (curva de scree plot), permitiendo identificar el punto de inflexión (\\textit{knee point}) óptimo que equilibra la maximización de estudios relevantes recuperados y la minimización del volumen de referencias a revisar manualmente.
 
-\\begin{figure}[H]
+\\begin{figure}[!htbp]
 \\centering
-\\includegraphics[width=0.85\\textwidth]{scree_plot}
+\\includegraphics[width=\\linewidth]{scree_plot}
 \\caption{Scree plot: distribución de puntajes de relevancia semántica ordenados decrecientemente. La línea vertical roja señala el punto de inflexión utilizado como umbral de corte para priorizar la revisión manual.}
 \\label{fig:codo}
 \\end{figure}
@@ -397,12 +383,12 @@ function generateResultsSection(resultsContent) {
 
 El proceso completo de identificación, cribado y selección de estudios se resume en el diagrama de flujo de la Figura~\\ref{fig:prisma}, elaborado conforme a las directrices PRISMA 2020.
 
-\\begin{figure}[H]
+\\begin{figure*}[!htbp]
 \\centering
-\\includegraphics[width=0.95\\textwidth]{prisma_diagram}
+\\includegraphics[width=0.9\\textwidth]{prisma_diagram}
 \\caption{Diagrama de flujo PRISMA 2020 del proceso de revisión sistemática. Muestra las fases de identificación, cribado, elegibilidad e inclusión final, así como las razones específicas de exclusión en cada etapa.}
 \\label{fig:prisma}
-\\end{figure}
+\\end{figure*}
 
 ` + content;
     }
@@ -417,12 +403,12 @@ El proceso completo de identificación, cribado y selección de estudios se resu
 
 El proceso completo de identificación, cribado y selección de estudios se resume en el diagrama de flujo de la Figura~\\ref{fig:prisma}, elaborado conforme a las directrices PRISMA 2020.
 
-\\begin{figure}[H]
+\\begin{figure*}[!htbp]
 \\centering
-\\includegraphics[width=0.95\\textwidth]{prisma_diagram}
+\\includegraphics[width=0.9\\textwidth]{prisma_diagram}
 \\caption{Diagrama de flujo PRISMA 2020 del proceso de revisión sistemática. Muestra las fases de identificación, cribado, elegibilidad e inclusión final de estudios, con desglose detallado por base de datos académica y razones específicas de exclusión en cada etapa.}
 \\label{fig:prisma}
-\\end{figure}
+\\end{figure*}
 
 La búsqueda inicial identificó un total de [N] registros en las bases de datos consultadas, de los cuales [N] fueron eliminados por duplicación. Tras el cribado de [N] títulos y resúmenes, se seleccionaron [N] artículos para revisión de texto completo. Finalmente, [N] estudios cumplieron todos los criterios de inclusión y fueron incluidos en la síntesis cualitativa.
 
@@ -589,8 +575,8 @@ function processMarkdownTables(text) {
     const tableCaption = generateTableCaption(headers);
     const tableLabel = tableCaption.includes('Bases de datos') ? 'tab:busqueda' : `tab:table${tableCounter}`;
     
-    // Construir tabla LaTeX con formato correcto
-    let latexTable = '\n\\begin{table}[H]\n';
+    // Construir tabla LaTeX con formato correcto (doble columna / spans si necesario)
+    let latexTable = '\n\\begin{table*}[!htbp]\n';
     latexTable += '\\centering\n';
     latexTable += '\\renewcommand{\\arraystretch}{1.3}\n';
     latexTable += `\\caption{${tableCaption}}\n`;
@@ -612,7 +598,7 @@ function processMarkdownTables(text) {
     
     latexTable += '\\bottomrule\n';
     latexTable += '\\end{tabular}\n';
-    latexTable += '\\end{table}\n\n';
+    latexTable += '\\end{table*}\n\n';
     
     return latexTable;
   });

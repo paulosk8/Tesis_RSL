@@ -16,9 +16,9 @@ class ArticleVersionRepository {
       INSERT INTO article_versions (
         id, project_id, version_number, title,
         abstract, introduction, methods, results,
-        discussion, conclusions, references_section, declarations,
+        discussion, conclusions, references_section,
         word_count, change_description, created_by, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
       RETURNING *
     `;
 
@@ -34,7 +34,6 @@ class ArticleVersionRepository {
       articleVersion.sections?.discussion || articleVersion.discussion || '',
       articleVersion.sections?.conclusions || articleVersion.conclusions || '',
       articleVersion.sections?.references || articleVersion.referencesSection || '',
-      articleVersion.sections?.declarations || articleVersion.declarations || '',
       articleVersion.wordCount,
       articleVersion.changeDescription || articleVersion.description,
       articleVersion.createdBy,
@@ -52,7 +51,7 @@ class ArticleVersionRepository {
     const query = `
       SELECT 
         av.*,
-        u.full_name as creator_name
+        u.name as creator_name
       FROM article_versions av
       LEFT JOIN users u ON u.id = av.created_by
       WHERE av.project_id = $1
@@ -77,7 +76,7 @@ class ArticleVersionRepository {
     const query = `
       SELECT 
         av.*,
-        u.full_name as creator_name
+        u.name as creator_name
       FROM article_versions av
       LEFT JOIN users u ON u.id = av.created_by
       WHERE av.project_id = $1
@@ -103,7 +102,7 @@ class ArticleVersionRepository {
     const query = `
       SELECT 
         av.*,
-        u.full_name as creator_name
+        u.name as creator_name
       FROM article_versions av
       LEFT JOIN users u ON u.id = av.created_by
       WHERE av.id = $1
@@ -160,10 +159,6 @@ class ArticleVersionRepository {
       if (updates.sections.references !== undefined) {
         fields.push(`references_section = $${paramCount++}`);
         values.push(updates.sections.references);
-      }
-      if (updates.sections.declarations !== undefined) {
-        fields.push(`declarations = $${paramCount++}`);
-        values.push(updates.sections.declarations);
       }
     }
     if (updates.wordCount !== undefined) {

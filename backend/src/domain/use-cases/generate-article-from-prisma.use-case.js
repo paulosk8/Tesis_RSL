@@ -96,10 +96,24 @@ ${text}`;
   classifyStudiesForRQs(rqsEntries, protocol) {
     console.log('🔍 Re-clasificando estudios para RQs basándose en keywords del protocolo...');
 
-    const researchQuestions = protocol.researchQuestions || [];
+    let researchQuestions = protocol.researchQuestions || [];
+
+    // Fallback: Si no hay RQs, intentar extraerlas del campo 'objective' u 'objectives' (asumiendo formato lista)
+    if (researchQuestions.length === 0) {
+      const objText = protocol.objective || protocol.objectives || '';
+      const extractedRQs = objText.split(/[—\-\n;]/)
+                                 .map(s => s.trim())
+                                 .filter(s => s.length > 10 && (s.includes('?') || s.toLowerCase().includes('qué') || s.toLowerCase().includes('cómo') || s.toLowerCase().includes('cuál')));
+      if (extractedRQs.length > 0) {
+        researchQuestions = extractedRQs;
+        console.log(`✅ Preguntas de investigación extraídas exitosamente desde los objetivos: ${researchQuestions.length}`);
+      }
+    }
 
     if (researchQuestions.length === 0) {
-      console.warn('⚠️ No se encontraron preguntas de investigación en el protocolo, omitiendo re-clasificación');
+      console.warn('⚠️ No se encontraron preguntas de investigación en el protocolo, omitiendo re-clasificación. El artículo no tendrá lista de preguntas si esto está vacío.');
+      // Vamos a intentar extraerlas del campo "objectives" si están presentes y "researchQuestions" está vacío.
+      // (En este caso no hacemos la re-clasificación automática pero lanzamos el warning)
       return rqsEntries.map(entry => {
         for (let i = 1; i <= 3; i++) {
           if (!entry[`rq${i}Relation`]) entry[`rq${i}Relation`] = 'no';
@@ -265,6 +279,18 @@ ${text}`;
       const prismaContext = contextResult.context;
       let rqsEntries = await this.rqsEntryRepository.findByProject(projectId);
 
+      // ✅ RESTRICCIÓN OBLIGATORIA: Solo usar los que tienen estado "included" o "fulltext_included" (revisión manual)
+      if (this.referenceRepository) {
+        const allReferences = await this.referenceRepository.findByProject(projectId);
+        const manuallyIncludedIds = new Set(
+          allReferences
+            .filter(ref => ref.manualReviewStatus === 'included')
+            .map(ref => ref.id)
+        );
+        rqsEntries = rqsEntries.filter(entry => manuallyIncludedIds.has(entry.referenceId));
+        console.log(`📌 Filtrados estrictamente por revisión manual: ${rqsEntries.length} estudios.`);
+      }
+
       // ✅ CORRECCIÓN: Re-clasificar estudios para RQs
       if (rqsEntries.length > 0) {
         rqsEntries = this.classifyStudiesForRQs(rqsEntries, prismaContext.protocol || {});
@@ -280,7 +306,7 @@ ${text}`;
       rqsEntries.forEach((entry, idx) => {
         console.log(`   S${idx + 1}: ${entry.author} (${entry.year}) - ${entry.title?.substring(0, 60)}...`);
       });
-      console.log(`⚠️  GPT-4 DEBE USAR SOLO ESTOS ${rqsEntries.length} ESTUDIOS, NO PUEDE INVENTAR MÁS`);
+      console.log(`⚠️  LA IA GEMINI DEBE USAR SOLO ESTOS ${rqsEntries.length} ESTUDIOS, NO PUEDE INVENTAR MÁS`);
 
       // 3. Calcular estadísticas detalladas RQS
       const rqsStats = this.calculateDetailedRQSStatistics(rqsEntries);
@@ -382,7 +408,7 @@ ${text}`;
       // Lote 2: methods + results (independientes)
       const [methods, results] = await Promise.all([
         this.generateProfessionalMethods(prismaMapping, prismaContext, rqsEntries, chartPathsForArticle),
-        this.generateProfessionalResults(prismaMapping, prismaContext, rqsEntries, rqsStats, chartPathsForArticle)
+        this.generateProfessionalResults(prismaMapping, prismaContext, rqsEntries, rqsStats, chartPathsForArticle, enhancedChartData)
       ]);
       console.log('   ✅ Lote 2 completado: methods, results');
 
@@ -684,14 +710,8 @@ Generate ONLY the introduction text in English:`;
     let searchChart = '';
     
     if (searchQueries.length > 0) {
-      // Tenemos queries per-database: cruzar con databases reales (que tienen hits)
-      const dbsWithHits = new Set(databases.map(db => (db.name || db || '').toLowerCase()));
+      // Usar todas las queries del protocolo
       const tableRows = searchQueries
-        .filter(sq => {
-          // Incluir solo las bases de datos que realmente tienen referencias cargadas
-          const sqName = (DB_NAME_MAP[sq.database] || DB_NAME_MAP[sq.databaseId] || sq.databaseName || sq.database || '').toLowerCase();
-          return dbsWithHits.size === 0 || dbsWithHits.has(sqName);
-        })
         .map(sq => {
           const dbName = DB_NAME_MAP[sq.database] || DB_NAME_MAP[sq.databaseId] || sq.databaseName || sq.database || 'N/A';
           const searchStr = sq.query || globalSearchString || 'N/A';
@@ -755,7 +775,7 @@ To optimize the screening process and reduce manual effort without compromising 
 
 **Phase 1 — Semantic Similarity Ranking (Embeddings):** Each downloaded reference was processed through a semantic similarity model (text-embedding-ada-002, OpenAI) that computed a cosine similarity score in the range [0, 1] against a vector representation of the predefined PICO-based inclusion criteria. ${prismaContext.screening.phase1 ? `The model processed ${prismaContext.screening.phase1.highConfidenceInclude + prismaContext.screening.phase1.highConfidenceExclude + prismaContext.screening.phase1.greyZone} references with an average similarity score of ${(prismaContext.screening.phase1.avgSimilarity * 100).toFixed(1)}%. Using adaptive percentile thresholds${prismaContext.screening.similarityThresholds ? ` (upper: ${(prismaContext.screening.similarityThresholds.embeddings * 100).toFixed(1)}%)` : ''}, references were triaged into three categories: **${prismaContext.screening.phase1.highConfidenceInclude} high-confidence includes** (above upper threshold), **${prismaContext.screening.phase1.highConfidenceExclude} high-confidence excludes** (below lower threshold), and **${prismaContext.screening.phase1.greyZone} grey-zone references** requiring further analysis.` : 'References were triaged into three categories based on adaptive percentile thresholds: high-confidence includes, high-confidence excludes, and grey-zone references requiring further analysis.'}
 
-**Phase 2 — LLM-Based Grey Zone Analysis (ChatGPT):** ${prismaContext.screening.phase2 ? `The ${prismaContext.screening.phase2.analyzed} grey-zone references were individually evaluated by a large language model (${prismaContext.screening.phase2.method || 'GPT-4'}) prompted with the PICO criteria and inclusion/exclusion rules. The LLM classified each reference as: **${prismaContext.screening.phase2.included} included**, **${prismaContext.screening.phase2.excluded} excluded**, and **${prismaContext.screening.phase2.manual} flagged for manual review** by the principal investigator.` : 'Grey-zone references were individually evaluated by a large language model prompted with the PICO criteria and inclusion/exclusion rules, classifying each as included, excluded, or flagged for manual review.'}
+**Phase 2 — LLM-Based Grey Zone Analysis (Gemini/ChatGPT):** ${prismaContext.screening.phase2 ? `The ${prismaContext.screening.phase2.analyzed} grey-zone references were individually evaluated by a large language model (${prismaContext.screening.phase2.method || 'Gemini 2.5 Pro'}) prompted with the PICO criteria and inclusion/exclusion rules. The LLM classified each reference as: **${prismaContext.screening.phase2.included} included**, **${prismaContext.screening.phase2.excluded} excluded**, and **${prismaContext.screening.phase2.manual} flagged for manual review** by the principal investigator.` : 'Grey-zone references were individually evaluated by a large language model prompted with the PICO criteria and inclusion/exclusion rules, classifying each as included, excluded, or flagged for manual review.'}
 
 The resulting scores were sorted in descending order and plotted as a scree curve (Figure 1). The **elbow method** (knee-point detection) was applied to this curve to identify the optimal inflection point — the threshold below which the marginal gain in relevant study recovery diminishes sharply. ${prismaContext.screening.cutoffMethod ? `The cutoff method employed was **${prismaContext.screening.cutoffMethod}**.` : ''}
 
@@ -833,7 +853,7 @@ The synthesis was organized around the three research questions, integrating fin
   /**
    * RESULTADOS PROFESIONALES con análisis estadístico real y síntesis por RQ
    */
-  async generateProfessionalResults(prismaMapping, prismaContext, rqsEntries, rqsStats, charts = {}) {
+  async generateProfessionalResults(prismaMapping, prismaContext, rqsEntries, rqsStats, charts = {}, enhancedChartData = null) {
     // Generar análisis RQS detallado
     const rqsAnalysis = await this.generateDetailedRQSAnalysis(rqsEntries, rqsStats, prismaContext);
 
@@ -862,6 +882,21 @@ The synthesis was organized around the three research questions, integrating fin
     const fullTextAssessed = prismaContext.screening.fullTextAssessed || 0;
     const excludedFullText = prismaContext.screening.excludedFullText || 0;
     const finalIncluded = prismaContext.screening.includedFinal || rqsStats.total;
+
+    let bubbleSection = '';
+    if (enhancedChartData && enhancedChartData.hasBubbleData && charts.bubble_chart) {
+      bubbleSection = `\n### 3.4.4 Metrics and Technologies Mapping\n\n![Metrics vs Technologies Distribution](${charts.bubble_chart})\n*Figure 5. Distribution of reported metrics across different technologies. Bubble size represents the number of studies reporting each metric-technology combination. This visualization reveals which technologies have been most thoroughly evaluated and which metrics are most commonly used.*\n`;
+    } else if (enhancedChartData && !enhancedChartData.hasBubbleData) {
+       bubbleSection = `\n### 3.4.4 Metrics and Technologies Mapping\n\nNo structured quantitative metrics could be consistently mapped across the included studies to generate a dimension mapping. The synthesis relies primarily on qualitative findings.\n`;
+    }
+
+    let synthesisSection = '';
+    if (enhancedChartData && enhancedChartData.hasSynthesisData) {
+      const summaryTable = this.generateTechnicalSynthesisMarkdownTable(enhancedChartData.technical_synthesis.studies);
+      synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\n${summaryTable}\n*Table 5. Comparative synthesis of quantitative metrics. This table summarizes the empirical evidence reported in each study, enabling direct comparison between different approaches and methodologies. Note: N/R indicates Not Reported.*\n`;
+    } else if (enhancedChartData && !enhancedChartData.hasSynthesisData) {
+      synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\nDirect quantitative comparison of technical performance could not be performed due to the lack of standardized metrics across the included studies. Future research should prioritize standardizing reporting metrics for this domain.\n`;
+    }
 
     return `## 3.1 Study Selection
 
@@ -914,9 +949,47 @@ Regarding the third question, **${rqsStats.rqRelations.rq3.yes} studies** contri
 
 ${rq3Synthesis}
 
-${charts.bubble_chart ? `\n### 3.4.4 Metrics and Technologies Mapping\n\n![Metrics vs Technologies Distribution](${charts.bubble_chart})\n*Figure 5. Distribution of reported metrics across different technologies. Bubble size represents the number of studies reporting each metric-technology combination. This visualization reveals which technologies have been most thoroughly evaluated and which metrics are most commonly used.*\n` : ''}
+${bubbleSection}
 
-${charts.technical_synthesis ? `\n### 3.4.5 Technical Performance Synthesis\n\n![Comparative Technical Metrics](${charts.technical_synthesis})\n*Figure 6. Comparative synthesis of quantitative metrics across included studies. This table summarizes the empirical evidence reported in each study, enabling direct comparison between different approaches and methodologies. Note: Metrics displayed are dynamically extracted from the actual reported data in each study.*\n` : ''}`;
+${synthesisSection}`;
+  }
+
+  /**
+   * Generar Tabla Markdown para Síntesis Técnica (Dinámica)
+   */
+  generateTechnicalSynthesisMarkdownTable(studiesArray) {
+    if (!studiesArray || studiesArray.length === 0) return '';
+    
+    // Extraer todas las columnas únicas de todos los estudios
+    const allColsSet = new Set(['study', 'tool']);
+    studiesArray.forEach(study => {
+      Object.keys(study).forEach(k => {
+        if (k !== 'study' && k !== 'tool' && study[k] !== null && study[k] !== undefined && study[k] !== '') {
+          allColsSet.add(k);
+        }
+      });
+    });
+    
+    const displayCols = Array.from(allColsSet);
+    
+    // Formatear cabeceras
+    const headerRow = displayCols.map(col => {
+      if (col === 'study') return 'Study';
+      if (col === 'tool') return 'Tool';
+      return col.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }).join(' | ');
+    
+    const separatorRow = displayCols.map(() => '---').join(' | ');
+    
+    const dataRows = studiesArray.map(study => {
+      return displayCols.map(col => {
+         const val = study[col];
+         if (val === null || val === undefined || val === '') return 'N/R';
+         return `${val}`.replace(/\|/g, '-'); // Evitar romper markdown
+      }).join(' | ');
+    }).join('\n');
+    
+    return `| ${headerRow} |\n| ${separatorRow} |\n| ${dataRows} |`;
   }
 
   /**
@@ -990,7 +1063,8 @@ ${this.generateTable2Professional(rqsEntries)}`;
    * Sintetizar hallazgos para RQ1
    */
   async synthesizeRQ1Findings(rqsEntries, prismaContext) {
-    const relevantStudies = rqsEntries.filter(e => e.rq1Relation === 'yes' || e.rq1Relation === 'partial');
+    const relevantStudies = rqsEntries.map((e, index) => ({...e, globalIndex: index + 1}))
+      .filter(e => e.rq1Relation === 'yes' || e.rq1Relation === 'partial');
 
     if (relevantStudies.length === 0) {
       return "No studies were identified that directly addressed this research question.";
@@ -1001,8 +1075,8 @@ ${this.generateTable2Professional(rqsEntries)}`;
 **⚠️ CRITICAL: You are ONLY allowed to mention these ${relevantStudies.length} studies. DO NOT invent or add any studies beyond this list:**
 
 **EVIDENCE EXTRACTED FROM STUDIES:**
-${relevantStudies.map((study, i) => `
-Study S${i + 1} (${study.author}, ${study.year}):
+${relevantStudies.map((study) => `
+Study [${study.globalIndex}] (${study.author}, ${study.year}):
 - Technology: ${study.technology}
 - Study type: ${study.studyType}
 - Context: ${study.context}
@@ -1031,15 +1105,14 @@ Generate 2-3 academic paragraphs (400-500 words) following this structure:
 3. **Cross-study analysis**: Compare approaches or results across different contexts (industrial/academic/experimental). Highlight which conditions favor specific solutions.
 
 **CRITICAL REQUIREMENTS - READ CAREFULLY:**
-- You have EXACTLY ${relevantStudies.length} study/studies. You CANNOT mention more than ${relevantStudies.length} study/studies.
-- The ONLY valid study IDs are: ${relevantStudies.map((_, i) => `S${i+1}`).join(', ')}
-- Reference specific studies using citation style: "...as reported by S1${relevantStudies.length > 1 ? ', S2' : ''}" (only use IDs from the list above)
+- You have EXACTLY ${relevantStudies.length} study/studies. You CANNOT mention more.
+- The ONLY valid study citations are IEEE format: ${relevantStudies.map(s => `[${s.globalIndex}]`).join(', ')}
+- Reference specific studies using IEEE citation style: "...as reported in [${relevantStudies[0].globalIndex}]${relevantStudies.length > 1 ? ` and [${relevantStudies[1].globalIndex}]` : ''}"
 - Include ONLY metrics explicitly mentioned in the EVIDENCE section above
 - DO NOT invent any data, studies, authors, or findings beyond what is explicitly provided
-- DO NOT add studies like "S${relevantStudies.length + 1}" or any ID beyond the provided list
 - DO NOT include personal opinions or value judgments — report findings ONLY
 - Avoid evaluative language like "interesting", "noteworthy", "remarkable", "surprisingly"
-- Factual reporting only: "S1 reported X" NOT "Interestingly, S1 found..."
+- Factual reporting only: "Study [N] reported X" NOT "Interestingly, [N] found..."
 - If source evidence is in Spanish, translate and integrate naturally into English prose
 - Connect findings to Figure 5 (bubble chart) if metrics/technologies are discussed
 - Third person impersonal, formal Academic English
@@ -1059,7 +1132,8 @@ Respond with paragraphs only (no section headers):`;
    * Sintetizar hallazgos para RQ2
    */
   async synthesizeRQ2Findings(rqsEntries, prismaContext) {
-    const relevantStudies = rqsEntries.filter(e => e.rq2Relation === 'yes' || e.rq2Relation === 'partial');
+    const relevantStudies = rqsEntries.map((e, index) => ({...e, globalIndex: index + 1}))
+      .filter(e => e.rq2Relation === 'yes' || e.rq2Relation === 'partial');
 
     if (relevantStudies.length === 0) {
       return "No studies were identified that directly addressed this research question.";
@@ -1067,12 +1141,12 @@ Respond with paragraphs only (no section headers):`;
 
     const prompt = `Synthesize the findings of ${relevantStudies.length} studies for: "${prismaContext.protocol.researchQuestions[1]}"
 
-**⚠️ CRITICAL: You have EXACTLY ${relevantStudies.length} study/studies. DO NOT mention more than ${relevantStudies.length} study/studies.**
-**The ONLY valid study IDs are: ${relevantStudies.map((_, i) => `S${i+1}`).join(', ')}**
+**⚠️ CRITICAL: You have EXACTLY ${relevantStudies.length} study/studies. DO NOT mention more.**
+**The ONLY valid citations are IEEE format: ${relevantStudies.map(s => `[${s.globalIndex}]`).join(', ')}**
 
 **EVIDENCE:**
-${relevantStudies.map((study, i) => `
-S${i + 1} (${study.author}, ${study.year}):
+${relevantStudies.map((study) => `
+Study [${study.globalIndex}] (${study.author}, ${study.year}):
 - Key evidence: ${study.keyEvidence}
 - Technology: ${study.technology}
 - Context: ${study.context}
@@ -1092,7 +1166,7 @@ Generate 2-3 academic paragraphs (400-500 words) that:
 1. **Quantitative overview**: State how many studies addressed this question and their distribution by context/type
 
 2. **Evidence synthesis**: Organize findings by:
-   - Performance comparisons (if metrics available - reference Figure 6 for technical synthesis)
+   - Performance comparisons (if metrics available - reference Table 5 for technical synthesis)
    - Implementation approaches across different contexts
    - Advantages/disadvantages identified in the literature
    - Empirical vs. theoretical findings
@@ -1100,8 +1174,7 @@ Generate 2-3 academic paragraphs (400-500 words) that:
 3. **Critical analysis**: Identify consensus areas vs. gaps. Mention if certain contexts are underrepresented.
 
 **REQUIREMENTS - STRICT VALIDATION:**
-- You CANNOT invent or mention studies beyond: ${relevantStudies.map((_, i) => `S${i+1}`).join(', ')}
-- Use study citations ("S1${relevantStudies.length > 1 ? ' and S2' : ''} demonstrated...")
+- Use ONLY IEEE study citations: ("...demonstrated in [${relevantStudies[0].globalIndex}]${relevantStudies.length > 1 ? ` and [${relevantStudies[1].globalIndex}]` : ''}")
 - Include ONLY quantitative data explicitly provided in EVIDENCE section
 - DO NOT invent information, metrics, or findings
 - DO NOT include personal opinions or value judgments — report data ONLY
@@ -1125,7 +1198,8 @@ Respond with paragraphs only:`;
    * Sintetizar hallazgos para RQ3
    */
   async synthesizeRQ3Findings(rqsEntries, prismaContext) {
-    const relevantStudies = rqsEntries.filter(e => e.rq3Relation === 'yes' || e.rq3Relation === 'partial');
+    const relevantStudies = rqsEntries.map((e, index) => ({...e, globalIndex: index + 1}))
+      .filter(e => e.rq3Relation === 'yes' || e.rq3Relation === 'partial');
 
     if (relevantStudies.length === 0) {
       return "No studies were identified that directly addressed this research question.";
@@ -1134,11 +1208,11 @@ Respond with paragraphs only:`;
     const prompt = `Synthesize the findings of ${relevantStudies.length} studies for: "${prismaContext.protocol.researchQuestions[2]}"
 
 **⚠️ CRITICAL: You have EXACTLY ${relevantStudies.length} study/studies. DO NOT invent additional studies.**
-**The ONLY valid study IDs are: ${relevantStudies.map((_, i) => `S${i+1}`).join(', ')}**
+**The ONLY valid citations are IEEE format: ${relevantStudies.map(s => `[${s.globalIndex}]`).join(', ')}**
 
 **EVIDENCE:**
-${relevantStudies.map((study, i) => `
-S${i + 1} (${study.author}, ${study.year}):
+${relevantStudies.map((study) => `
+Study [${study.globalIndex}] (${study.author}, ${study.year}):
 - Key evidence: ${study.keyEvidence}
 - Limitations: ${study.limitations}
 - Technology: ${study.technology}
@@ -1164,10 +1238,8 @@ Generate 2-3 academic paragraphs (400-500 words) that:
 3. **Critical discussion**: Analyze the strength of evidence. Mention if certain aspects are well-supported vs. under-researched.
 
 **REQUIREMENTS - NO HALLUCINATIONS:**
-- You have EXACTLY ${relevantStudies.length} studies. You CANNOT mention more.
-- Valid study IDs: ${relevantStudies.map((_, i) => `S${i+1}`).join(', ')} (NO OTHER IDs ALLOWED)
+- Use ONLY IEEE study citations: ("...identified in [${relevantStudies[0].globalIndex}]${relevantStudies.length > 1 ? ` and [${relevantStudies[1].globalIndex}]` : ''}")
 - Prioritize evidence from high-quality studies
-- Reference studies with citations ("S1${relevantStudies.length > 1 ? ' and S2' : ''} identified...")
 - Include ONLY quantitative data explicitly provided above
 - Acknowledge limitations transparently
 - DO NOT invent data, studies, or findings
@@ -1198,7 +1270,7 @@ Respond with paragraphs only:`;
 | ID | Author (Year) | Study Type | Context | Main Technology | Publication |
 |----|-------------|-----------------|----------|---------------------|-------------|
 ${rqsEntries.map((entry, i) => {
-      const id = `S${i + 1}`;
+      const id = `[${i + 1}]`;
       const author = `${entry.author} (${entry.year})`;
       const type = this.translateStudyType(entry.studyType);
       const context = this.translateContext(entry.context);
@@ -1206,8 +1278,6 @@ ${rqsEntries.map((entry, i) => {
       const source = entry.title ? entry.title.substring(0, 30) + '...' : 'N/A';
       return `| ${id} | ${author} | ${type} | ${context} | ${tech} | ${source} |`;
     }).join('\n')}
-
-*Note: Studies are identified as S1-S${rqsEntries.length} for ease of reference in the analysis.*
 `;
   }
 
@@ -1218,7 +1288,7 @@ ${rqsEntries.map((entry, i) => {
 | ID | Key Evidence | Main Metrics | RQ1 | RQ2 | RQ3 | Quality |
 |----|----------------|---------------------|-----|-----|-----|---------|
 ${rqsEntries.map((entry, i) => {
-      const id = `S${i + 1}`;
+      const id = `[${i + 1}]`;
       const evidence = (entry.keyEvidence || 'Not reported').substring(0, 60) + '...';
 
       // Metrics - filtrar valores null, Unknown, N/A
@@ -1259,7 +1329,7 @@ ${rqsEntries.map((entry, i) => {
 | ID | Adequate Design | Sufficient Data | Limitations Reported | Transparency | Overall Risk |
 |----|----------------|-------------------|------------------------|---------------|---------------|
 ${rqsEntries.map((entry, i) => {
-      const id = `S${i + 1}`;
+      const id = `[${i + 1}]`;
 
       // Evaluación basada en RQS
       const hasLimitations = entry.limitations && entry.limitations.length > 20;
@@ -1653,6 +1723,29 @@ The authors declare that the PRISMA 2020 guidelines have been strictly followed 
     const metricToolMap = {}; // Para bubble chart: "metric:tool" -> count
     
     rqsEntries.forEach(entry => {
+      // Parse metrics robustly
+      let parsedMetrics = entry.metrics;
+      let parseAttempts = 0;
+      
+      // Manejar el caso donde PostgreSQL o Prisma devuelve un string en vez de objeto JSON
+      // o donde hay "doble stringify" (ej: "{\"latency\": \"10ms\"}")
+      while (typeof parsedMetrics === 'string' && parseAttempts < 3) {
+        try {
+          parsedMetrics = JSON.parse(parsedMetrics);
+          parseAttempts++;
+        } catch(e) {
+          // Si falla el parseo, detener intentos
+          break;
+        }
+      }
+      
+      // Si después de intentar parsear no es un objeto, ponerlo vacío
+      if (typeof parsedMetrics !== 'object' || parsedMetrics === null) {
+        parsedMetrics = {};
+      }
+
+      console.log(`[DEBUG METRICS] Author: ${entry.author}, Type: ${typeof parsedMetrics}, Keys: ${Object.keys(parsedMetrics)}, Raw (first 30 chars): ${String(entry.metrics).substring(0, 30)}`);
+
       // 1. DISTRIBUCIÓN TEMPORAL: Contar estudios por año
       if (entry.year) {
         const year = entry.year.toString();
@@ -1680,11 +1773,12 @@ The authors declare that the PRISMA 2020 guidelines have been strictly followed 
       }
 
       // 3. BUBBLE CHART: Mapear métricas vs tecnologías
-      if (entry.metrics && typeof entry.metrics === 'object' && entry.technology) {
-        const metrics = entry.metrics;
+      if (parsedMetrics && typeof parsedMetrics === 'object' && entry.technology) {
+        const metrics = parsedMetrics;
         // Iterar sobre las métricas disponibles en el entry
         Object.keys(metrics).forEach(metricKey => {
-          if (metrics[metricKey] !== null && metrics[metricKey] !== undefined) {
+          const val = metrics[metricKey];
+          if (val !== null && val !== undefined && val !== 'null' && val !== 'N/A' && val !== 'Unknown' && val !== '' && val !== '{}') {
             const mapKey = `${metricKey}:${entry.technology}`;
             metricToolMap[mapKey] = (metricToolMap[mapKey] || 0) + 1;
           }
@@ -1692,21 +1786,23 @@ The authors declare that the PRISMA 2020 guidelines have been strictly followed 
       }
 
       // 4. TECHNICAL SYNTHESIS: Tabla comparativa de métricas por estudio (DINÁMICA)
-      if (entry.metrics && typeof entry.metrics === 'object' && Object.keys(entry.metrics).length > 0) {
+      if (parsedMetrics && typeof parsedMetrics === 'object' && Object.keys(parsedMetrics).length > 0) {
         const studyLabel = (entry.author && entry.year) ? `${entry.author} ${entry.year}` : 'Unknown';
         const studyData = {
           study: studyLabel,
           tool: entry.technology || 'N/A',
-          ...entry.metrics // Incluir TODAS las métricas dinámicamente
+          ...parsedMetrics // Incluir TODAS las métricas dinámicamente
         };
         
         // Solo agregar si tiene al menos una métrica (más allá de study y tool)
-        const metricsKeys = Object.keys(entry.metrics).filter(k => 
-          entry.metrics[k] !== null && 
-          entry.metrics[k] !== undefined && 
-          entry.metrics[k] !== '' &&
-          entry.metrics[k] !== 'N/A' &&
-          entry.metrics[k] !== 'Unknown'
+        const metricsKeys = Object.keys(parsedMetrics).filter(k => 
+          parsedMetrics[k] !== null && 
+          parsedMetrics[k] !== undefined && 
+          parsedMetrics[k] !== '' &&
+          parsedMetrics[k] !== 'N/A' &&
+          parsedMetrics[k] !== 'Unknown' &&
+          parsedMetrics[k] !== 'null' &&
+          parsedMetrics[k] !== '{}'
         );
         
         if (metricsKeys.length > 0) {
@@ -1738,6 +1834,9 @@ The authors declare that the PRISMA 2020 guidelines have been strictly followed 
         return countB - countA;
       })
       .slice(0, 15);
+
+    chartData.hasBubbleData = chartData.bubble_chart.entries.length > 0;
+    chartData.hasSynthesisData = chartData.technical_synthesis.studies.length > 0;
 
     return chartData;
   }
@@ -2021,12 +2120,14 @@ The authors gratefully acknowledge the institutions that provided access to the 
 - DISCUSSION sections may include interpretations, comparisons, and implications
 - Avoid evaluative language in Results ("interesting", "noteworthy", "remarkable", "surprisingly")
 
-**ABSOLUTE PROHIBITIONS:**
-- DO NOT invent data, studies, authors, or unmentioned findings
-- DO NOT use speculative language without evidence
-- DO NOT make causal claims without evidence
-- DO NOT cite studies not included in the review
-- DO NOT use first person or colloquial language
+**ABSOLUTE PROHIBITIONS (ANTI-HALLUCINATION PROTOCOL):**
+- DO NOT invent data, studies, authors, or unmentioned findings UNDER ANY CIRCUMSTANCE.
+- DO NOT use speculative language without evidence.
+- DO NOT make causal claims without evidence.
+- CRITICAL EXTREME RULE: DO NOT cite, mention, or reference ANY real-world or fictional paper, author, study, framework, or technology if it is NOT explicitly listed in the source data provided in the prompt.
+- DO NOT add general citations like "Smith et al." or "recent studies [15]" to pad the text if they weren't in the provided list. 
+- You may ONLY use citation numbers [1], [2], [3] etc. corresponding EXACTLY to the numbered references provided to you.
+- DO NOT use first person or colloquial language.
 
 **GUIDING PRINCIPLE:**
 A quality systematic review is transparent about what it knows, what it does not know, and why.`;

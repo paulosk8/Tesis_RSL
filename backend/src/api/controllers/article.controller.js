@@ -102,12 +102,6 @@ class ArticleController {
       // ✅ Extender timeout del request a 10 minutos (artículo hace muchas llamadas IA)
       if (req.setTimeout) req.setTimeout(600000);
       if (res.setTimeout) res.setTimeout(600000);
-      // Prevent proxy/load-balancer timeout by keeping connection alive
-      const keepAliveInterval = setInterval(() => {
-        if (!res.headersSent) {
-          res.write(''); // no-op to keep connection alive
-        }
-      }, 25000);
 
       // Crear use cases
       const aiService = new AIService(req.userId);
@@ -144,7 +138,6 @@ class ArticleController {
       });
 
       const result = await generateArticleUseCase.execute(projectId);
-      clearInterval(keepAliveInterval);
 
       // Transformar a formato esperado por frontend (claves en inglés)
       const article = result.article;
@@ -170,7 +163,6 @@ class ArticleController {
       });
 
     } catch (error) {
-      clearInterval(keepAliveInterval);
       console.error('❌ Error generando artículo:', error);
 
       // Error específico si PRISMA incompleto
