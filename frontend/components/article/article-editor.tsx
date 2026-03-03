@@ -16,16 +16,38 @@ import { PrismaFlowDiagram } from "@/components/screening/prisma-flow-diagram"
 const serifFont = "'Times New Roman', 'Noto Serif', Georgia, serif"
 
 // Componentes de Markdown — diseño académico tipo journal
-const MarkdownImage = ({ node, ...props }: any) => (
-  <figure className="my-5 text-center">
-    <img
-      {...props}
-      alt={props.alt || 'Imagen del artículo'}
-      className="max-w-[90%] h-auto mx-auto border border-border rounded"
-      loading="lazy"
-    />
-  </figure>
-)
+const MarkdownImage = ({ node, ...props }: any) => {
+  const [error, setError] = React.useState(false)
+  const captionText = props.alt || ''
+
+  return (
+    <figure className="my-6 text-center">
+      {error ? (
+        <div className="inline-flex flex-col items-center justify-center gap-2 max-w-[90%] mx-auto p-4 border border-dashed border-amber-400 bg-amber-50 dark:bg-amber-950/20 rounded text-amber-700 dark:text-amber-400 text-sm">
+          <span>⚠️ Imagen no disponible</span>
+          {captionText && <span className="text-xs opacity-75">{captionText}</span>}
+          <span className="text-xs opacity-50 italic break-all">{props.src}</span>
+        </div>
+      ) : (
+        <img
+          {...props}
+          alt={captionText}
+          className="max-w-[90%] h-auto mx-auto border border-border rounded shadow-sm"
+          loading="lazy"
+          onError={() => setError(true)}
+        />
+      )}
+      {captionText && !error && (
+        <figcaption
+          className="mt-2 text-muted-foreground italic text-center"
+          style={{ fontFamily: "'Times New Roman', Georgia, serif", fontSize: '10pt' }}
+        >
+          {captionText}
+        </figcaption>
+      )}
+    </figure>
+  )
+}
 
 const MarkdownTable = ({ node, ...props }: any) => (
   <div className="overflow-x-auto my-6">
@@ -161,19 +183,19 @@ interface ArticleEditorProps {
 
 export function ArticleEditor({ version, onContentChange, disabled = false, prismaStats }: ArticleEditorProps) {
   const [editingSection, setEditingSection] = useState<string | null>(null)
-  
+
   // Markdown components for Results section: replaces PRISMA chart images with React component
   const resultsMarkdownComponents: Components = {
     ...markdownComponents,
     // Fix HTML nesting: check AST node before transformation
     p: ({ node, children, ...props }: any) => {
       // Check AST node for img child with PRISMA alt text
-      const hasPrismaImg = node?.children?.some((child: any) => 
-        child.type === 'element' && 
-        child.tagName === 'img' && 
+      const hasPrismaImg = node?.children?.some((child: any) =>
+        child.type === 'element' &&
+        child.tagName === 'img' &&
         child.properties?.alt?.toLowerCase().includes('prisma')
       )
-      
+
       if (hasPrismaImg && prismaStats) {
         return (
           <div className="my-6">
@@ -181,7 +203,7 @@ export function ArticleEditor({ version, onContentChange, disabled = false, pris
           </div>
         )
       }
-      
+
       return <MarkdownParagraph node={node} {...props}>{children}</MarkdownParagraph>
     },
     img: ({ node, ...props }: any) => {
