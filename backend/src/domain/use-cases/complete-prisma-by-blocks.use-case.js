@@ -50,12 +50,20 @@ class CompletePrismaByBlocksUseCase {
       for (let i = 0; i < blocks.length; i++) {
         const blockName = blocks[i];
         console.log(`Procesando bloque: ${blockName.toUpperCase()}`);
-        const blockResult = await this.processBlock(projectId, blockName, prismaContext);
-        results[blockName] = blockResult;
+        
+        try {
+          const blockResult = await this.processBlock(projectId, blockName, prismaContext);
+          results[blockName] = blockResult;
+          console.log(`✅ Bloque ${blockName.toUpperCase()} completado`);
+        } catch (blockError) {
+          console.error(`❌ Error en bloque ${blockName.toUpperCase()}:`, blockError.message);
+          results[blockName] = { success: false, error: blockError.message };
+          // Continuar con los siguientes bloques aunque este falle
+        }
         
         if (blocks.length > 1 && i < blocks.length - 1) {
-          console.log("⏱️ Esperando 35s para evitar Error 429 de Gemini Free Tier...");
-          await new Promise(resolve => setTimeout(resolve, 35000));
+          console.log("⏱️ Esperando 15s entre bloques para estabilizar conexión...");
+          await new Promise(resolve => setTimeout(resolve, 15000));
         }
       }
 

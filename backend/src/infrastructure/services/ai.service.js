@@ -66,52 +66,88 @@ class AIService {
    * Genera texto con Gemini 2.5 Pro
    * @private
    */
-  async _generateWithGemini(systemPrompt, userPrompt, maxRetries = 3) {
+  async _generateWithGemini(systemPrompt, userPrompt, maxRetries = 5) {
     if (!this.gemini) {
       throw new Error('Gemini API key no configurada');
     }
 
+    // Modelos a intentar en orden de preferencia
+    const modelsToTry = ['gemini-2.5-pro', 'gemini-2.0-flash'];
     let lastError = null;
     let tokensUsed = 0;
 
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-      try {
-        const model = this.gemini.getGenerativeModel({ 
-          model: "gemini-2.5-pro",
-          systemInstruction: systemPrompt,
-          generationConfig: {
-            temperature: 0.3,
-            maxOutputTokens: 8192
+    for (const modelName of modelsToTry) {
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`🤖 [${modelName}] Intento ${attempt}/${maxRetries}...`);
+          const model = this.gemini.getGenerativeModel({ 
+            model: modelName,
+            systemInstruction: systemPrompt,
+            generationConfig: {
+              temperature: 0.3,
+              maxOutputTokens: 8192
+            }
+          });
+
+          const result = await model.generateContent(userPrompt);
+          const response = await result.response;
+          
+          tokensUsed = response.usageMetadata?.totalTokenCount || 0;
+          await this._trackUsage('gemini', 'generateContent', modelName, tokensUsed, true, null);
+          console.log(`✅ Respuesta recibida de ${modelName} (intento ${attempt})`);
+          return response.text();
+
+        } catch (error) {
+          lastError = error;
+          const errorMessage = error.message.toLowerCase();
+
+          // Errores de red transitorios: reintentar con backoff
+          const isNetworkError = 
+            errorMessage.includes('fetch failed') ||
+            errorMessage.includes('econnreset') ||
+            errorMessage.includes('enotfound') ||
+            errorMessage.includes('etimedout') ||
+            errorMessage.includes('socket hang up') ||
+            errorMessage.includes('network') ||
+            errorMessage.includes('connection');
+
+          // Errores de rate limit: reintentar con backoff largo
+          const isRateLimit =
+            errorMessage.includes('429') ||
+            errorMessage.includes('quota') ||
+            errorMessage.includes('too many requests') ||
+            errorMessage.includes('resource_exhausted');
+
+          // Errores de modelo no disponible: saltar al siguiente modelo
+          const isModelUnavailable =
+            errorMessage.includes('404') ||
+            errorMessage.includes('not found') ||
+            errorMessage.includes('not supported') ||
+            errorMessage.includes('model') && errorMessage.includes('unavailable');
+
+          if (isModelUnavailable) {
+            console.warn(`⚠️ Modelo ${modelName} no disponible, intentando siguiente modelo...`);
+            await this._trackUsage('gemini', 'generateContent', modelName, 0, false, error.message);
+            break; // Salir del bucle de reintentos para este modelo
           }
-        });
 
-        const result = await model.generateContent(userPrompt);
-        const response = await result.response;
-        
-        tokensUsed = response.usageMetadata?.totalTokenCount || 0;
-        await this._trackUsage('gemini', 'generateContent', 'gemini-2.5-pro', tokensUsed, true, null);
-
-        return response.text();
-      } catch (error) {
-        lastError = error;
-        const errorMessage = error.message.toLowerCase();
-        
-        // Check for rate limit or quota exceeded
-        if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('too many requests')) {
-          console.warn(`⏳ [Intento ${attempt}/${maxRetries}] Límite de cuota Gemini excedido. Esperando antes de reintentar...`);
-          if (attempt < maxRetries) {
-            // Exponential backoff: 23s, 46s
-            const waitTime = 23000 * attempt; 
-            await new Promise(resolve => setTimeout(resolve, waitTime));
+          if ((isNetworkError || isRateLimit) && attempt < maxRetries) {
+            const waitSeconds = isRateLimit ? 25 * attempt : 5 * attempt;
+            console.warn(`⏳ [${modelName}] Intento ${attempt}/${maxRetries} fallido (${isRateLimit ? 'rate limit' : 'error de red'}). Reintentando en ${waitSeconds}s...`);
+            await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
             continue;
           }
+
+          // Error no recuperable en este modelo
+          console.error(`❌ [${modelName}] Fallido definitivamente:`, error.message);
+          await this._trackUsage('gemini', 'generateContent', modelName, 0, false, error.message);
+          break; // Intentar el siguiente modelo
         }
-        
-        // Track the failed usage if we've exhausted retries or it's a non-retryable error
-        await this._trackUsage('gemini', 'generateContent', 'gemini-2.5-pro', 0, false, error.message);
-        throw error;
       }
     }
+
+    // Todos los modelos fallaron
+    throw lastError || new Error('Todos los modelos de Gemini están no disponibles');
   }
 
   /**
