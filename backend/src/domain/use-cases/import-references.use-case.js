@@ -903,6 +903,26 @@ class ImportReferencesUseCase {
   }
 
   /**
+   * Limpia un valor BibTeX eliminando llaves de protección de mayúsculas
+   * y caracteres LaTeX comunes.
+   * Ej: "{MERN} {Stack} {Web}-{Based}" → "MERN Stack Web-Based"
+   */
+  cleanBibTeXValue(value) {
+    if (!value) return value;
+    let clean = value
+      // Quitar llaves de protección: {Word} → Word
+      .replace(/\{([^{}]*)\}/g, '$1')
+      // Quitar cualquier llave suelta restante
+      .replace(/[{}]/g, '')
+      // Limpiar comandos LaTeX comunes tipo \emph{...} (ya sin llaves)
+      .replace(/\\[a-zA-Z]+/g, '')
+      // Normalizar espacios múltiples
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+    return clean;
+  }
+
+  /**
    * Parser simple de BibTeX
    * Formato usado por LaTeX, BibDesk, JabRef, etc.
    */
@@ -970,7 +990,8 @@ class ImportReferencesUseCase {
       console.log(`parseBibTeX: Extraídos ${Object.keys(fields).length} campos`);
       
       for (const [key, value] of Object.entries(fields)) {
-        const cleanValue = value.trim();
+        // Limpiar llaves BibTeX de protección de mayúsculas ({MERN} → MERN)
+        const cleanValue = this.cleanBibTeXValue(value.trim());
         
         switch (key.toLowerCase()) {
           case 'title':
