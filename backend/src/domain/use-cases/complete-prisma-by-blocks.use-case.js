@@ -46,10 +46,10 @@ class CompletePrismaByBlocksUseCase {
 
       const results = {};
 
-      // 3. Ejecutar cada bloque secuencialmente
+      // 3. Ejecutar cada bloque secuencialmente (primer pase)
       for (let i = 0; i < blocks.length; i++) {
         const blockName = blocks[i];
-        console.log(`Procesando bloque: ${blockName.toUpperCase()}`);
+        console.log(`📝 Procesando bloque: ${blockName.toUpperCase()} (${i + 1}/${blocks.length})`);
         
         try {
           const blockResult = await this.processBlock(projectId, blockName, prismaContext);
@@ -58,16 +58,52 @@ class CompletePrismaByBlocksUseCase {
         } catch (blockError) {
           console.error(`❌ Error en bloque ${blockName.toUpperCase()}:`, blockError.message);
           results[blockName] = { success: false, error: blockError.message };
-          // Continuar con los siguientes bloques aunque este falle
+          // Continuar con los siguientes bloques, pero registrar el fallo
         }
         
         if (blocks.length > 1 && i < blocks.length - 1) {
-          console.log("⏱️ Esperando 15s entre bloques para estabilizar conexión...");
           await new Promise(resolve => setTimeout(resolve, 15000));
         }
       }
 
-      // 4. Obtener estadísticas actualizadas
+      // 4. Reintentar bloques fallidos (obligatorio — ningún bloque puede quedar incompleto)
+      const MAX_RETRY_PASSES = 3;
+      for (let pass = 1; pass <= MAX_RETRY_PASSES; pass++) {
+        const failedBlocks = blocks.filter(b => results[b]?.success === false);
+        if (failedBlocks.length === 0) break; // Todos completos ✅
+
+        console.log(`\n🔄 Reintento ${pass}/${MAX_RETRY_PASSES} — ${failedBlocks.length} bloque(s) pendiente(s): ${failedBlocks.join(', ')}`);
+        console.log(`⏱️ Esperando 30s antes del reintento...`);
+        await new Promise(resolve => setTimeout(resolve, 30000));
+
+        for (const blockName of failedBlocks) {
+          console.log(`🔁 Reintentando bloque: ${blockName.toUpperCase()}`);
+          try {
+            const blockResult = await this.processBlock(projectId, blockName, prismaContext);
+            results[blockName] = blockResult;
+            console.log(`✅ Bloque ${blockName.toUpperCase()} completado en reintento ${pass}`);
+          } catch (retryError) {
+            console.error(`❌ [Reintento ${pass}] Bloque ${blockName.toUpperCase()} sigue fallando:`, retryError.message);
+            results[blockName] = { success: false, error: retryError.message };
+          }
+          // Pausa entre bloques reintentados
+          await new Promise(resolve => setTimeout(resolve, 10000));
+        }
+      }
+
+      // 5. Verificar si quedan bloques sin completar
+      const stillFailed = blocks.filter(b => results[b]?.success === false);
+      if (stillFailed.length > 0) {
+        console.error(`⛔ Los siguientes bloques no pudieron completarse tras todos los reintentos: ${stillFailed.join(', ')}`);
+        console.error('   Errores:', stillFailed.map(b => `${b}: ${results[b].error}`).join(' | '));
+        // No lanzar error — retornar resultado parcial con indicación de fallo
+        // El usuario puede reintentar manualmente el bloque específico
+      } else {
+        console.log(`🎉 Todos los bloques PRISMA completados exitosamente`);
+      }
+
+
+      // 6. Obtener estadísticas actualizadas
       const stats = await this.prismaItemRepository.getComplianceStats(projectId);
 
       return {

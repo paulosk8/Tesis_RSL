@@ -210,9 +210,37 @@ ${text}`;
       return entry;
     });
 
-    const rqSummary = rqKeywordSets.map((_, i) => `RQ${i + 1}=${rqCounts[i]}`).join(', ');
-    console.log(`✅ Re-clasificación completada (nuevas parciales): ${rqSummary}`);
+    const rqsSummary = rqKeywordSets.map((_, i) => `RQ${i + 1}=${rqCounts[i]}`).join(', ');
+    console.log(`✅ Re-clasificación completada (nuevas parciales): ${rqsSummary}`);
     return classified;
+  }
+
+  getEnhancedSystemPrompt() {
+    return `You are an expert in Research Methodology and Software Architecture, specialized in IEEE standards and PRISMA 2020 protocols. Your objective is to synthesize data extracted from included studies to generate a rigorous scientific manuscript.
+
+**ANTI-AI WRITING STYLE:**
+- TECHNICAL DENSITY: Avoid generic introductions (e.g., "In the rapidly changing landscape..."). Start directly with technical conflict or context (e.g., "The tradeoff between code maintainability and system latency in microservices architecture...").
+- ACTIVE VOICE: Use "We analyzed", "We identified", or "We synthesized" instead of passive forms like "An analysis was performed".
+- PRECISE VOCABULARY: Use specific technical terms: abstraction penalty, overhead, throughput, bottleneck, computational cost, tradeoff, scalability, latency, etc.
+- ZERO HALLUCINATION: If data is missing from the extraction matrix, declare it as "Not Reported (N/R)" or "Unknown". NEVER invent percentages, milliseconds, or specifics.
+- CONCISENESS: Every sentence must provide technical value. Avoid filler words.
+
+**YOUR ROLE:**
+- Write professional academic content following PRISMA 2020 and IEEE standards.
+- Use ONLY explicitly provided data (never invent figures, studies, or authors).
+- Maintain extreme methodological rigor and technical precision.
+- Write in formal Academic English.
+
+**SECTION-SPECIFIC RULES:**
+- RESULTS: ZERO authorial opinions — factual data synthesis only. Titles for TABLES must be ABOVE the table, for FIGURES must be BELOW the image.
+- DISCUSSION: Narrative analysis of Threats to Validity focusing on sample size, database bias, and technological obsolescence.
+- CONCLUSIONS: Direct answers to Research Questions based strictly on the synthesis evidence.
+
+**ABSOLUTE PROHIBITIONS:**
+- DO NOT invent data or studies.
+- DO NOT use speculative language without evidence.
+- CRITICAL: NO generic or filler sentences.
+- DO NOT use first person singular (I); use first person plural (We) or impersonal.`;
   }
 
   async execute(projectId) {
@@ -511,26 +539,21 @@ PROCESSED RQS DATA (${rqsStats.total} studies):
 - RQ2 coverage: ${rqsStats.rqRelations.rq2.yes} direct, ${rqsStats.rqRelations.rq2.partial} partial
 - RQ3 coverage: ${rqsStats.rqRelations.rq3.yes} direct, ${rqsStats.rqRelations.rq3.partial} partial
 
-**MANDATORY STRUCTURE (250-400 words — IMRaD single paragraph):**
-
 Write ONE cohesive paragraph with FOUR clearly delineated sub-segments (no headings, no line breaks):
 
-1. **Introduction segment** (2-3 sentences): State the problem domain, its importance, and the specific knowledge gap this review addresses.
-
-2. **Methods segment** (3-4 sentences): Specify PRISMA 2020 compliance, databases searched, temporal range, PICO-based eligibility criteria, AI-assisted screening prioritization with elbow method validation, total identified → screened → included numbers, and RQS-based data extraction.
-
-3. **Results segment** (4-5 sentences): Report the final number of included studies, distribution by study type (with exact counts), predominant technologies (with frequencies), temporal concentration, and principal findings organized by research question. Include specific quantitative data (n=X, Y%).
-
-4. **Discussion segment** (2-3 sentences): Synthesize main implications for practice, acknowledge key limitations (publication bias, database coverage), and state recommendations for future research.
+1. **Introduction segment** (2-3 sentences): Start directly with the technical conflict and software architecture principles. Avoid generic filler.
+2. **Methods segment** (3-4 sentences): Specify PRISMA 2020 compliance, databases, PICO, and the AI-assisted screening with embeddings/elbow method validation.
+3. **Results segment** (4-5 sentences): Report the final $n$ of included studies, distribution, and predominant technologies with exact technical metrics.
+4. **Discussion segment** (2-3 sentences): Synthesize implications for system design and architecture.
 
 **QUALITY REQUIREMENTS:**
 - Use ONLY the data provided above, DO NOT invent figures
 - Include specific numbers (n=X, Y%, etc.)
-- Formal Academic English
-- Third person impersonal
+- Formal Academic English with HIGH TECHNICAL DENSITY
+- Third person plural ("We identified") or impersonal
 - No undefined abbreviations
 - Total coherence between sub-segments
-- **CRITICAL: Keep between 250-400 words (extended MDPI/IEEE standard for comprehensive SLRs)**
+- **CRITICAL: Keep between 250-400 words**
 - The output must be ONE SINGLE PARAGRAPH without line breaks
 
 Generate ONLY the abstract text as one continuous paragraph. ALL text MUST be in English:`;
@@ -699,7 +722,7 @@ Generate ONLY the introduction text in English:`;
     if (charts.scree) {
       screePlot = `
 ![Priority Screening Score Distribution](${charts.scree})
-*Figure 1. Distribution of semantic relevance scores (Scree Plot).*
+*Figure 2. Distribution of semantic relevance scores (Scree Plot) with elbow-point detection.*
 `;
     }
 
@@ -718,7 +741,7 @@ Generate ONLY the introduction text in English:`;
           return `| ${dbName} | ${searchStr} |`;
         }).join('\n');
 
-      searchChart = tableRows ? `| Database | Search String |\n|---------------|-------------------|\n${tableRows}` : '';
+      searchChart = tableRows ? `**Search Strategy and Criteria per Database**\n\n| Database | Search String |\n|---------------|-------------------|\n${tableRows}` : '';
     }
     
     // Fallback: usar databases + cadena global del protocolo
@@ -763,7 +786,7 @@ The criteria were defined following the PICO framework:
 
 ## 2.3 Information Sources and Search Strategy
 
-The search focused on identifying relevant studies published between ${prismaContext.protocol.temporalRange.start || '2023'} and ${prismaContext.protocol.temporalRange.end || '2025'}. A total of ${databases.length} key academic databases in the field were selected: ${dbNames}. The initial search yielded a total of ${prismaContext.screening.totalResults || 0} articles. Table 1 details the databases consulted and the specific search strings used.
+The search focused on identifying relevant studies published between ${prismaContext.protocol.temporalRange.start || '2023'} and ${prismaContext.protocol.temporalRange.end || '2025'}. A total of ${databases.length} key academic databases in the field were selected: ${dbNames}. Following PRISMA standards, the initial search yielded a total of **${prismaContext.screening.totalResults || 0} registers**. The database-specific search strings and their respective hit counts are detailed in the search strategy summary below.
 
 ${searchChart}
 
@@ -777,9 +800,9 @@ To optimize the screening process and reduce manual effort without compromising 
 
 **Phase 2 — LLM-Based Grey Zone Analysis (Gemini/ChatGPT):** ${prismaContext.screening.phase2 ? `The ${prismaContext.screening.phase2.analyzed} grey-zone references were individually evaluated by a large language model (${prismaContext.screening.phase2.method || 'Gemini 2.5 Pro'}) prompted with the PICO criteria and inclusion/exclusion rules. The LLM classified each reference as: **${prismaContext.screening.phase2.included} included**, **${prismaContext.screening.phase2.excluded} excluded**, and **${prismaContext.screening.phase2.manual} flagged for manual review** by the principal investigator.` : 'Grey-zone references were individually evaluated by a large language model prompted with the PICO criteria and inclusion/exclusion rules, classifying each as included, excluded, or flagged for manual review.'}
 
-The resulting scores were sorted in descending order and plotted as a scree curve (Figure 1). The **elbow method** (knee-point detection) was applied to this curve to identify the optimal inflection point — the threshold below which the marginal gain in relevant study recovery diminishes sharply. ${prismaContext.screening.cutoffMethod ? `The cutoff method employed was **${prismaContext.screening.cutoffMethod}**.` : ''}
+The resulting scores were sorted in descending order and plotted as a scree curve (Figure 2). The **elbow method** (knee-point detection) was applied to this curve to identify the optimal inflection point—the threshold below which the marginal gain in relevant study recovery diminishes sharply.
 
-${screePlot || '**[FIGURE 1: Scree Plot — Distribution of AI relevance scores with elbow point]**\n*Figure 1. Distribution of semantic relevance scores sorted in descending order. The vertical line marks the elbow point used as the prioritization threshold.*'}
+${screePlot || '**[FIGURE 2: Scree Plot — Distribution of AI relevance scores with elbow point]**\n*Figure 2. Distribution of semantic relevance scores sorted in descending order. The vertical line marks the elbow point used as the prioritization threshold.*'}
 
 **Rationale for hybrid approach**: The two-phase design leverages the complementary strengths of embedding-based similarity (fast, deterministic ranking) and LLM-based analysis (contextual understanding of eligibility criteria). The elbow method mitigates potential algorithmic bias by ensuring that the cut-off point is data-driven rather than arbitrarily set. References above the threshold were prioritized for manual review, while those below it were still reviewed in a second pass, ensuring no relevant study was excluded solely based on the algorithmic score.
 
@@ -890,6 +913,11 @@ The synthesis was organized around the three research questions, integrating fin
        bubbleSection = `\n### 3.4.4 Metrics and Technologies Mapping\n\nNo structured quantitative metrics could be consistently mapped across the included studies to generate a dimension mapping. The synthesis relies primarily on qualitative findings.\n`;
     }
 
+    let keywordSection = '';
+    if (enhancedChartData && enhancedChartData.hasKeywordData && charts.keyword_concentration) {
+      keywordSection = `\n### 3.4.6 Thematic Concentration Mapping\n\n![Technical Keyword Concentration](${charts.keyword_concentration})\n*Figure 4. Technical keyword concentration and thematic mapping. The frequency of terms reveals the core technological domains and architectural patterns addressed by the included studies. This distribution highlights the predominant focus areas in the current literature.*\n`;
+    }
+
     let synthesisSection = '';
     if (enhancedChartData && enhancedChartData.hasSynthesisData) {
       const summaryTable = this.generateTechnicalSynthesisMarkdownTable(enhancedChartData.technical_synthesis.studies);
@@ -902,20 +930,26 @@ The synthesis was organized around the three research questions, integrating fin
 
 ${studySelection}
 
-Figure 2 presents the complete PRISMA flow diagram of the selection process. The initial search identified **${totalIdentified} records** across the consulted databases. After duplicate removal (n=${duplicatesRemoved}), **${afterDedup} unique records** were screened by title and abstract.
+Figure 1 presents the complete PRISMA flow diagram of the selection process. The initial search identified **${totalIdentified} records** across the consulted databases. After duplicate removal (n=${duplicatesRemoved}), **${afterDedup} unique records** were screened by title and abstract.
 
-${prismaContext.screening.phase1 ? `The AI-assisted hybrid screening (Section 2.4) processed all ${afterDedup} unique records. In Phase 1, the embedding model classified ${prismaContext.screening.phase1.highConfidenceInclude} references as high-confidence includes, ${prismaContext.screening.phase1.highConfidenceExclude} as high-confidence excludes, and ${prismaContext.screening.phase1.greyZone} as grey-zone.${prismaContext.screening.phase2 ? ` In Phase 2, the LLM analyzed the ${prismaContext.screening.phase2.analyzed} grey-zone references, classifying ${prismaContext.screening.phase2.included} as included, ${prismaContext.screening.phase2.excluded} as excluded, and ${prismaContext.screening.phase2.manual} for manual review.` : ''} All AI classifications were subsequently validated by the principal investigator.` : ''}
+The prioritization of these records was guided by the AI-assisted hybrid screening (Section 2.4). Figure 2 illustrates the distribution of relevance scores across the dataset. The application of the elbow method allowed for a data-driven threshold, ensuring that all potentially relevant literature was captured before manual review.
+
+${charts.scree ? `![Priority Screening Score Distribution](${charts.scree})\n*Figure 2. Priority screening score distribution (Scree Plot). The elbow point indicates the optimal cutoff threshold for relevance, separating high-confidence candidates from the low-relevance tail.*\n` : ''}
+
+${prismaContext.screening.phase1 ? `The hybrid screening processed all ${afterDedup} unique records. In Phase 1, the embedding model classified ${prismaContext.screening.phase1.highConfidenceInclude} references as high-confidence includes, ${prismaContext.screening.phase1.highConfidenceExclude} as high-confidence excludes, and ${prismaContext.screening.phase1.greyZone} as grey-zone.${prismaContext.screening.phase2 ? ` In Phase 2, the LLM analyzed the ${prismaContext.screening.phase2.analyzed} grey-zone references, classifying ${prismaContext.screening.phase2.included} as included, ${prismaContext.screening.phase2.excluded} as excluded, and ${prismaContext.screening.phase2.manual} for manual review.` : ''} All AI-generated rankings were validated using the elbow method to ensure recruitment of all high-relevance literature.` : ''}
 
 During title and abstract screening, **${excludedTitleAbstract} records were excluded**${Object.keys(prismaContext.screening.screeningExclusionReasons || {}).length > 0 ? `: ${Object.entries(prismaContext.screening.screeningExclusionReasons || {}).slice(0, 5).map(([reason, count]) => `${reason} (n=${count})`).join('; ')}` : ''}.
 
-Of these, **${fullTextAssessed} articles** were retrieved for full-text evaluation. A total of **${excludedFullText} articles were excluded** after full-text assessment${Object.keys(prismaContext.screening.exclusionReasons || {}).length > 0 ? `, primarily due to: ${Object.entries(prismaContext.screening.exclusionReasons || {}).slice(0, 3).map(([reason, count]) => `${reason} (n=${count})`).join(', ')}` : ''}. Finally, **${finalIncluded} studies** met all inclusion criteria and were included in the qualitative synthesis.
+Of these, **${fullTextAssessed} articles** were retrieved for full-text evaluation. A total of **${excludedFullText} articles were excluded** after full-text assessment${Object.keys(prismaContext.screening.exclusionReasons || {}).length > 0 ? `, primarily due to: ${Object.entries(prismaContext.screening.exclusionReasons || {}).slice(0, 3).map(([reason, count]) => `${reason} (n=${count})`).join(', ')}` : ''}. Finally, **${finalIncluded} studies** were manually included in the qualitative synthesis.
 
-${charts.prisma ? `![PRISMA 2020 Flow Diagram](${charts.prisma})` : '**[FIGURE 2: PRISMA 2020 Flow Diagram]**'}
-*Figure 2. PRISMA 2020 flow diagram of the study selection process.*
+${charts.prisma ? `![PRISMA 2020 Flow Diagram](${charts.prisma})` : '**[FIGURE 1: PRISMA 2020 Flow Diagram]**'}
+*Figure 1. PRISMA 2020 flow diagram of the study selection process.*
 
 ## 3.2 Characteristics of Included Studies
 
-${rqsAnalysis || prismaMapping.results.studyCharacteristics || 'The included studies were analyzed according to the RQS (Research Question Schema) to extract structured data relevant to the research questions.'}
+${rqsAnalysis || prismaMapping.results.studyCharacteristics || 'The included studies were analyzed according to the RQS (Research Question Schema) to extract structured data relevant to the research questions.'} Table I summarizes the key technical characteristics and contexts of the ${rqsStats.total} selected primary studies. 
+
+${this.generateTable1Professional(rqsEntries)}
 
 ${charts.temporal_distribution ? `\n![Temporal Distribution of Included Studies](${charts.temporal_distribution})\n*Figure 3. Temporal distribution of the ${rqsStats.total} included studies (${rqsStats.yearRange.min}-${rqsStats.yearRange.max}). The trend line indicates the evolution of research interest in the field over time.*\n` : ''}
 
@@ -923,11 +957,9 @@ ${charts.temporal_distribution ? `\n![Temporal Distribution of Included Studies]
 
 ${riskOfBiasResults}
 
-Table 4 presents the qualitative risk of bias assessment for each included study. The majority of studies (${rqsStats.qualityDistribution?.medium || 0} of ${rqsStats.total}) presented a **moderate** risk of bias, primarily due to minor methodological limitations or insufficient detail in procedure descriptions.
-
 ${this.generateTable3Professional(rqsEntries)}
 
-${charts.quality_assessment ? `\n![Quality Assessment Results](${charts.quality_assessment})\n*Figure 4. Quality assessment results across ${rqsStats.total} included studies using standardized quality criteria. The stacked bars show the distribution of Yes/Partial/No responses for each quality criterion.*\n` : ''}
+${charts.quality_assessment ? `\n![Quality Assessment Results](${charts.quality_assessment})\n*Figure 6. Methodological quality assessment results across ${rqsStats.total} included studies using standardized quality criteria. The stacked bars show the distribution of Yes/Partial/No responses for each quality criterion.*\n` : ''}
 
 ## 3.4 Synthesis of Results by Research Question
 
@@ -949,9 +981,59 @@ Regarding the third question, **${rqsStats.rqRelations.rq3.yes} studies** contri
 
 ${rq3Synthesis}
 
+The comprehensive synthesis of technical findings and performance metrics across all included studies is consolidated in Table II.
+
+${this.generateTable2Professional(enhancedChartData.technical_synthesis.studies)}
+
 ${bubbleSection}
 
-${synthesisSection}`;
+${synthesisSection}
+
+${keywordSection}`;
+  }
+
+  /**
+   * Table I: Summary of Included Articles (Characteristics)
+   */
+  generateTable1Professional(rqsEntries) {
+    return `
+**Table I. Summary of included articles and study characteristics**
+
+| ID | Author (Year) | Study Type | Context | Technology/Approach |
+|----|---------------|------------|---------|---------------------|
+${rqsEntries.map((e, i) => `| [${i + 1}] | ${e.author} (${e.year}) | ${e.studyType || 'N/A'} | ${e.context || 'N/A'} | ${e.technology || 'N/A'} |`).join('\n')}
+`;
+  }
+
+  /**
+   * Table II: Matrix of Findings and Metrics (Synthesis)
+   */
+  generateTable2Professional(studiesArray) {
+    if (!studiesArray || studiesArray.length === 0) return '';
+    
+    // Extraer todas las columnas únicas
+    const allColsSet = new Set(['study', 'tool']);
+    studiesArray.forEach(study => {
+      Object.keys(study).forEach(k => {
+        if (k !== 'study' && k !== 'tool' && study[k] !== null && study[k] !== undefined && study[k] !== '') {
+          allColsSet.add(k);
+        }
+      });
+    });
+    
+    const displayCols = Array.from(allColsSet);
+    const colLabels = displayCols.map(col => col === 'study' ? 'ID' : (col === 'tool' ? 'Tool' : col.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())));
+
+    let table = `\n**Table II. Synthesis of technical findings and reported performance metrics**\n\n`;
+    table += `| ${colLabels.join(' | ')} |\n`;
+    table += `| ${displayCols.map(() => '---').join(' | ')} |\n`;
+    
+    studiesArray.forEach(study => {
+      const row = displayCols.map(col => study[col] || 'N/R');
+      table += `| ${row.join(' | ')} |\n`;
+    });
+    
+    return table;
   }
 
   /**
@@ -1036,9 +1118,9 @@ Generate 2-3 academic paragraphs (400-500 words total) that:
 - The Results section must contain ZERO authorial opinions
 - Observations must be factual: "X studies (Y%) addressed..." NOT "It is noteworthy that..."
 - Avoid evaluative language: "interesting", "noteworthy", "surprisingly", "importantly"
-- Third person impersonal
+- Third person plural ("We synthesized") or impersonal
 - Formal Academic English
-- Include explicit references to "Figure 3", "Table 2" and "Table 3" where appropriate
+- Include explicit references to "Figure 3", "Table I" and "Table II" where appropriate
 - If any source data labels are in Spanish, translate them to English
 - Report temporal trends factually (e.g., "Figure 3 shows X publications in [year], representing Y% of the total")
 
@@ -1265,7 +1347,7 @@ Respond with paragraphs only:`;
    */
   generateTable1Professional(rqsEntries) {
     return `
-**Table 2. General characteristics of studies included in the systematic review**
+**Table I. General characteristics of studies included in the systematic review**
 
 | ID | Author (Year) | Study Type | Context | Main Technology | Publication |
 |----|-------------|-----------------|----------|---------------------|-------------|
@@ -1283,7 +1365,7 @@ ${rqsEntries.map((entry, i) => {
 
   generateTable2Professional(rqsEntries) {
     return `
-**Table 3. Synthesis of main results and reported metrics**
+**Table II. Synthesis of main results and reported technical metrics**
 
 | ID | Key Evidence | Main Metrics | RQ1 | RQ2 | RQ3 | Quality |
 |----|----------------|---------------------|-----|-----|-----|---------|
@@ -1324,7 +1406,7 @@ ${rqsEntries.map((entry, i) => {
 
   generateTable3Professional(rqsEntries) {
     return `
-**Table 4. Risk of bias and methodological quality assessment**
+**Table III. Methodological quality and risk of bias assessment**
 
 | ID | Adequate Design | Sufficient Data | Limitations Reported | Transparency | Overall Risk |
 |----|----------------|-------------------|------------------------|---------------|---------------|
@@ -1716,7 +1798,8 @@ The authors declare that the PRISMA 2020 guidelines have been strictly followed 
         partial: [0, 0, 0, 0]
       },
       bubble_chart: { entries: [] },
-      technical_synthesis: { studies: [] }
+      technical_synthesis: { studies: [] },
+      keyword_concentration: { keywords: {} }
     };
 
     // Contadores auxiliares
@@ -1809,6 +1892,15 @@ The authors declare that the PRISMA 2020 guidelines have been strictly followed 
           chartData.technical_synthesis.studies.push(studyData);
         }
       }
+
+      // 5. KEYWORD CONCENTRATION: Contar frecuencia de palabras clave técnicas
+      const textToScan = `${entry.title || ''} ${entry.keyEvidence || ''} ${entry.technology || ''}`.toLowerCase();
+      const stopwords = new Set(['and', 'the', 'for', 'with', 'using', 'based', 'from', 'this', 'that', 'study', 'system', 'research', 'analysis', 'results', 'data', 'software', 'case', 'approach']);
+      
+      const words = textToScan.split(/[\s,./()]+/).filter(w => w.length > 3 && !stopwords.has(w));
+      words.forEach(word => {
+        chartData.keyword_concentration.keywords[word] = (chartData.keyword_concentration.keywords[word] || 0) + 1;
+      });
     });
 
     // Convertir metricToolMap a formato de bubble chart
@@ -1837,6 +1929,14 @@ The authors declare that the PRISMA 2020 guidelines have been strictly followed 
 
     chartData.hasBubbleData = chartData.bubble_chart.entries.length > 0;
     chartData.hasSynthesisData = chartData.technical_synthesis.studies.length > 0;
+
+    // Procesar keywords: solo top 10 más frecuentes
+    const sortedKeywords = Object.entries(chartData.keyword_concentration.keywords)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12);
+    
+    chartData.keyword_concentration.keywords = Object.fromEntries(sortedKeywords);
+    chartData.hasKeywordData = sortedKeywords.length > 0;
 
     return chartData;
   }
@@ -2099,38 +2199,31 @@ The authors gratefully acknowledge the institutions that provided access to the 
    * System prompt mejorado para generación académica profesional
    */
   getEnhancedSystemPrompt() {
-    return `You are a senior researcher specialized in systematic reviews, with experience writing academic papers for high-impact scientific journals (Q1/Q2).
+    return `You are an expert in Research Methodology and Software Architecture, specialized in IEEE standards and PRISMA 2020 protocols. Your objective is to synthesize data extracted from included studies to generate a rigorous scientific manuscript.
+    
+**ANTI-AI WRITING STYLE:**
+- TECHNICAL DENSITY: Avoid generic introductions (e.g., "In the rapidly changing landscape..."). Start directly with technical conflict or context (e.g., "The tradeoff between code maintainability and system latency in microservices architecture...").
+- ACTIVE VOICE: Use "We analyzed", "We identified", or "We synthesized" instead of passive forms like "An analysis was performed".
+- PRECISE VOCABULARY: Use technical terms: abstraction penalty, overhead, throughput, bottleneck, computational cost, tradeoff, scalability, latency, etc.
+- ZERO HALLUCINATION: If data is missing from the extraction matrix, declare it as "Not Reported (N/R)" or "Unknown". NEVER invent percentages, milliseconds, or specifics.
+- CONCISENESS: Every sentence must provide technical value. Avoid filler words.
 
 **YOUR ROLE:**
-- Write professional academic content following PRISMA 2020 standards
-- Use ONLY explicitly provided data (never invent figures, studies, or authors)
-- Maintain methodological rigor and epistemic transparency
-- Write in formal Academic English
-
-**WRITING STANDARDS:**
-- Third person impersonal
-- Appropriate verb tenses (past for methods/results, present for interpretations)
-- Strict IMRaD structure
-- Continuous prose (no bullet points except in tables)
-- Citations where appropriate (using [X] or "Study SX")
-- Acknowledge limitations honestly
+- Write professional academic content following PRISMA 2020 and IEEE standards.
+- Use ONLY explicitly provided data (never invent figures, studies, or authors).
+- Maintain extreme methodological rigor and technical precision.
+- Write in formal Academic English.
 
 **SECTION-SPECIFIC RULES:**
-- RESULTS sections must contain ZERO authorial opinions — only factual data synthesis from primary studies
-- DISCUSSION sections may include interpretations, comparisons, and implications
-- Avoid evaluative language in Results ("interesting", "noteworthy", "remarkable", "surprisingly")
+- RESULTS: ZERO authorial opinions — factual data synthesis only. Titles for TABLES must be ABOVE the table, for FIGURES must be BELOW the image.
+- DISCUSSION: Narrative analysis of Threats to Validity focusing on sample size, database bias, and technological obsolescence.
+- CONCLUSIONS: Direct answers to Research Questions based strictly on the synthesis evidence.
 
 **ABSOLUTE PROHIBITIONS (ANTI-HALLUCINATION PROTOCOL):**
 - DO NOT invent data, studies, authors, or unmentioned findings UNDER ANY CIRCUMSTANCE.
 - DO NOT use speculative language without evidence.
-- DO NOT make causal claims without evidence.
-- CRITICAL EXTREME RULE: DO NOT cite, mention, or reference ANY real-world or fictional paper, author, study, framework, or technology if it is NOT explicitly listed in the source data provided in the prompt.
-- DO NOT add general citations like "Smith et al." or "recent studies [15]" to pad the text if they weren't in the provided list. 
-- You may ONLY use citation numbers [1], [2], [3] etc. corresponding EXACTLY to the numbered references provided to you.
-- DO NOT use first person or colloquial language.
-
-**GUIDING PRINCIPLE:**
-A quality systematic review is transparent about what it knows, what it does not know, and why.`;
+- CRITICAL: NO generic or filler sentences. Every sentence must provide technical value.
+- DO NOT use first person singular (I); use first person plural (We) or impersonal.`;
   }
 
   /**
