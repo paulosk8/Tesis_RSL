@@ -1,6 +1,5 @@
 const fs = require('fs');
 const path = require('path');
-const pdf = require('pdf-parse');
 
 /**
  * Use Case: Extraer Datos de PDFs Completos
@@ -22,9 +21,22 @@ class ExtractFullTextDataUseCase {
    */
   async extractTextFromPDF(pdfPath) {
     try {
+      const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
       const dataBuffer = fs.readFileSync(pdfPath);
-      const data = await pdf(dataBuffer);
-      return data.text;
+      const loadingTask = pdfjsLib.getDocument({
+        data: new Uint8Array(dataBuffer),
+        useWorkerFetch: false,
+        isEvalSupported: false,
+        useSystemFonts: true
+      });
+      const pdfDoc = await loadingTask.promise;
+      let text = '';
+      for (let i = 1; i <= pdfDoc.numPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map(item => item.str).join(' ') + '\n';
+      }
+      return text;
     } catch (error) {
       console.error(`Error extrayendo texto del PDF ${pdfPath}:`, error);
       throw new Error(`No se pudo leer el PDF: ${error.message}`);
@@ -121,11 +133,11 @@ Do NOT add any text before or after the JSON. Extract factual information only, 
   getLocalPdfPath(fullTextUrl) {
     if (!fullTextUrl) return null;
     
-    // Extraer filename de la URL: http://localhost:3001/uploads/fulltext-results/ref-xxx.pdf
+    // Extraer filename de la URL: http://localhost:3001/uploads/pdfs/ref-xxx.pdf
     const filename = fullTextUrl.split('/').pop();
     
-    // Construir ruta local desde backend root
-    return path.resolve(__dirname, '../../../uploads/fulltext-results/', filename);
+    // Construir ruta local desde backend root (db tiene URL con pdfs, multer guarda en pdfs)
+    return path.resolve(__dirname, '../../../uploads/pdfs/', filename);
   }
 
   /**

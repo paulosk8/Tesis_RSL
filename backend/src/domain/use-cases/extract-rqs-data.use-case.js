@@ -9,7 +9,6 @@
 const RQSEntry = require('../models/rqs-entry.model');
 const fs = require('node:fs');
 const path = require('node:path');
-const pdf = require('pdf-parse');
 
 class ExtractRQSDataUseCase {
   constructor({
@@ -144,10 +143,23 @@ class ExtractRQSDataUseCase {
   async extractTextFromPDF(pdfPath) {
     try {
       console.log(`📄 Leyendo PDF: ${pdfPath}`);
+      const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
       const dataBuffer = fs.readFileSync(pdfPath);
-      const data = await pdf(dataBuffer);
-      console.log(`✅ PDF leído exitosamente (${data.numpages} páginas, ${data.text.length} caracteres)`);
-      return data.text;
+      const loadingTask = pdfjsLib.getDocument({
+        data: new Uint8Array(dataBuffer),
+        useWorkerFetch: false,
+        isEvalSupported: false,
+        useSystemFonts: true
+      });
+      const pdfDoc = await loadingTask.promise;
+      let text = '';
+      for (let i = 1; i <= pdfDoc.numPages; i++) {
+        const page = await pdfDoc.getPage(i);
+        const content = await page.getTextContent();
+        text += content.items.map(item => item.str).join(' ') + '\n';
+      }
+      console.log(`✅ PDF leído exitosamente (${pdfDoc.numPages} páginas, ${text.length} caracteres)`);
+      return text;
     } catch (error) {
       console.error(`❌ Error leyendo PDF ${pdfPath}:`, error);
       return null;
@@ -160,11 +172,11 @@ class ExtractRQSDataUseCase {
   getLocalPdfPath(fullTextUrl) {
     if (!fullTextUrl) return null;
     
-    // Extraer filename de la URL: http://localhost:3001/uploads/fulltext-results/ref-xxx.pdf
+    // Extraer filename de la URL: http://localhost:3001/uploads/pdfs/ref-xxx.pdf
     const filename = fullTextUrl.split('/').pop();
     
-    // Construir ruta local desde backend root
-    return path.resolve(__dirname, '../../../uploads/fulltext-results/', filename);
+    // Construir ruta local desde backend root (la DB guarda la URL con pdfs, multer guarda en pdfs)
+    return path.resolve(__dirname, '../../../uploads/pdfs/', filename);
   }
 
   /**
@@ -202,7 +214,14 @@ class ExtractRQSDataUseCase {
       let data;
       if (typeof response === 'string') {
         try {
-          data = JSON.parse(response);
+          // Remove Markdown block formatting if Gemini wraps it in ```json ... ```
+          let cleanJson = response.trim();
+          if (cleanJson.startsWith('```json')) {
+            cleanJson = cleanJson.replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
+          } else if (cleanJson.startsWith('```')) {
+            cleanJson = cleanJson.replace(/^```\s*/i, '').replace(/\s*```$/i, '');
+          }
+          data = JSON.parse(cleanJson);
         } catch (parseError) {
           console.error('Error parseando JSON string:', parseError);
           console.error('Respuesta recibida:', response);
@@ -399,9 +418,8 @@ EXTRAE los siguientes campos y responde SOLO con JSON:
   "context": "industrial | enterprise | academic | experimental | mixed | other",
   "keyEvidence": "Hallazgos principales reportados (2-3 oraciones)",
   "metrics": {
-    "latency": "X ms",
-    "throughput": "Y Gbps",
-    "efficiency": "Z%"
+    "nombreMetrica1EnIngles": "valor con unidad (ej: 15ms)",
+    "nombreMetrica2EnIngles": "valor numérico (ej: 99.9%)"
   },
   "rq1Relation": "yes | no | partial",
   "rq2Relation": "yes | no | partial",
@@ -416,7 +434,7 @@ EXTRAE los siguientes campos y responde SOLO con JSON:
 - **technology**: Extrae EXACTAMENTE el nombre de la tecnología evaluada
 - **context**: Identifica si fue aplicado en industria real, empresa, laboratorio académico, etc.
 - **keyEvidence**: Resume los resultados/hallazgos PRINCIPALES en 2-3 oraciones
-- **metrics**: Extrae SOLO métricas con valores numéricos reportados
+- **metrics**: ⚠️ IMPORTANTE: Extrae CUALQUIER métrica con valor cuantitativo (precisión, velocidad, costo, tiempo, etc.). Pon los nombres de las métricas en INGLÉS. Si no hay métricas cuantitativas numéricas explícitas, deja este objeto vacío: {}
 - **rqRelation**: Evalúa si el estudio responde cada RQ (yes=responde directamente, partial=responde indirectamente, no=no responde)
 - **limitations**: Copia textualmente si los autores declaran limitaciones
 
