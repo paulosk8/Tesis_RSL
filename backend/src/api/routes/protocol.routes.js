@@ -36,4 +36,18 @@ router.put(
   (req, res) => protocolController.update(req, res)
 );
 
+/**
+ * @route   POST /api/projects/:projectId/protocol/generate-rqs
+ * @desc    Generar preguntas de investigación automáticamente
+ * @access  Private
+ */
+router.post(
+  '/:projectId/protocol/generate-rqs',
+  [
+    param('projectId').isUUID().withMessage('ID de proyecto inválido'),
+    validateRequest
+  ],
+  (req, res) => protocolController.generateRQs(req, res)
+);
+
 module.exports = router;

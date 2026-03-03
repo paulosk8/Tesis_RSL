@@ -1,5 +1,6 @@
 const ProtocolRepository = require('../../infrastructure/repositories/protocol.repository');
 const ProjectRepository = require('../../infrastructure/repositories/project.repository');
+const GenerateResearchQuestionsUseCase = require('../../domain/use-cases/generate-research-questions.use-case');
 
 /**
  * Controlador de protocolos
@@ -108,6 +109,73 @@ class ProtocolController {
       res.status(400).json({
         success: false,
         message: error.message || 'Error al actualizar protocolo'
+      });
+    }
+  }
+
+  /**
+   * POST /api/projects/:projectId/protocol/generate-rqs
+   */
+  async generateRQs(req, res) {
+    try {
+      const { projectId } = req.params;
+      const userId = req.userId;
+
+      // 1. Verificar permisos
+      const isOwner = await this.projectRepository.isOwner(projectId, userId);
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permiso para realizar esta acción'
+        });
+      }
+
+      // 2. Obtener protocolo actual
+      const protocol = await this.protocolRepository.findByProjectId(projectId);
+      if (!protocol) {
+        return res.status(404).json({
+          success: false,
+          message: 'Protocolo no encontrado. Define el marco PICO primero.'
+        });
+      }
+
+      // 3. Obtener datos del proyecto para el contexto
+      const project = await this.projectRepository.findById(projectId);
+
+      // 4. Ejecutar caso de uso
+      const generateUseCase = new GenerateResearchQuestionsUseCase();
+      const result = await generateUseCase.execute({
+        projectTitle: project.name,
+        projectDescription: project.description,
+        researchArea: protocol.researchArea || project.area,
+        picoData: {
+          population: protocol.population,
+          intervention: protocol.intervention,
+          comparison: protocol.comparison,
+          outcomes: protocol.outcomes
+        }
+      });
+
+      // 5. Persistir las RQs generadas
+      const updatedProtocol = await this.protocolRepository.update(projectId, {
+        researchQuestions: result.researchQuestions
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Preguntas de investigación generadas exitosamente',
+        data: {
+          researchQuestions: result.researchQuestions,
+          protocol: updatedProtocol.toJSON()
+        }
+      });
+
+    } catch (error) {
+      console.error('Error generando RQs:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Error al generar preguntas de investigación',
+        error: error.message
       });
     }
   }

@@ -125,6 +125,8 @@ class ProtocolRepository {
       // PRISMA desbloqueado
       prismaUnlocked: 'prisma_unlocked',
       
+      researchQuestions: 'research_questions',
+      
       // Estado
       completed: 'completed'
     };
@@ -167,6 +169,12 @@ class ProtocolRepository {
     if (protocolData.protocolDefinition && typeof protocolData.protocolDefinition === 'object') {
       console.log('🏷️ Mapeando términos del protocolo desde estructura wizard:', protocolData.protocolDefinition);
       mappedData.keyTerms = protocolData.protocolDefinition;
+    }
+
+    // 5. Mapear RQs si vienen en estructura anidada o directa
+    if (protocolData.researchQuestions && Array.isArray(protocolData.researchQuestions)) {
+      console.log('❓ Mapeando preguntas de investigación:', protocolData.researchQuestions.length);
+      mappedData.researchQuestions = protocolData.researchQuestions;
     }
 
     // Usar el modelo Protocol para manejar la serialización correctamente

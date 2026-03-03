@@ -21,6 +21,9 @@ class Protocol {
     this.comparison = data.comparison;
     this.outcomes = data.outcomes;
     
+    // Preguntas de Investigación (RQs)
+    this.researchQuestions = data.research_questions || data.researchQuestions || [];
+    
     // Criterios
     this.inclusionCriteria = data.inclusion_criteria || data.inclusionCriteria || [];
     this.exclusionCriteria = data.exclusion_criteria || data.exclusionCriteria || [];
@@ -81,6 +84,7 @@ class Protocol {
         comparison: this.comparison,
         outcomes: this.outcomes
       },
+      researchQuestions: this.researchQuestions,
       inclusionCriteria: this.inclusionCriteria,
       exclusionCriteria: this.exclusionCriteria,
       searchStrategy: {
@@ -129,6 +133,7 @@ class Protocol {
       intervention: this.intervention,
       comparison: this.comparison,
       outcomes: this.outcomes,
+      research_questions: safeStringify(this.researchQuestions),
       inclusion_criteria: safeStringify(this.inclusionCriteria),
       exclusion_criteria: safeStringify(this.exclusionCriteria),
       databases: safeStringify(this.databases),
