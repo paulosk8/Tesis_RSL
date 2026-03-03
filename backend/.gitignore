@@ -42,6 +42,33 @@ Thumbs.db
 coverage/
 .nyc_output/
 
+# Scripts temporales de diagnóstico (check_*.js, test_*.js, fix_*.js)
+check_*.js
+check_*.py
+test_*.js
+test_*.py
+fix_*.js
+fix_*.py
+
+# Archivos de salida temporales
+out.json
+out*.json
+output.json
+*.test.json
+test_payload*.json
+
+# Caché de Python
+scripts/__pycache__/
+__pycache__/
+*.pyc
+*.pyo
+
+# Datos de Docker / PostgreSQL (archivos binarios de BD)
+docker/postgres_data/
+
+# Caché general
+.cache/
+
 # Uploads
 uploads/
 public/uploads/
@@ -49,3 +76,9 @@ public/uploads/
 # Archivos de build
 dist/
 build/
+
+# Scripts adicionales de prueba
+patch_*.js
+patch_*.py
+reset_*.js
+test-*.js

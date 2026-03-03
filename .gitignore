@@ -25,3 +25,28 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+# Scripts temporales de diagnóstico en la raíz del proyecto
+fix_*.js
+fix_*.py
+revert_*.js
+check_*.js
+check_*.py
+test_*.js
+test_*.py
+
+# Archivos de prueba generados (PDF, PNG, JSON)
+prisma_test.*
+out.json
+out*.json
+output.json
+
+# Datos binarios de PostgreSQL/Docker
+backend/docker/postgres_data/
+
+# Caché de Python
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+
+# Caché general de herramientas
+backend/.cache/
