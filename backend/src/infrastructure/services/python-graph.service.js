@@ -135,33 +135,43 @@ class PythonGraphService {
                 console.log('🐍 Python output (raw):', stdout);
                 
                 try {
-                    const results = JSON.parse(stdout);
+                    // Extract JSON from output in case there are warnings or other text
+                    const jsonStart = stdout.indexOf('{');
+                    const jsonEnd = stdout.lastIndexOf('}');
+                    
+                    if (jsonStart === -1 || jsonEnd === -1) {
+                         throw new Error("No JSON found in python output");
+                    }
+                    
+                    const jsonStr = stdout.substring(jsonStart, jsonEnd + 1);
+                    const results = JSON.parse(jsonStr);
                     console.log('📊 Resultados parseados:', results);
                     
-                    // Convertir a URLs absolutas apuntando al backend
-                    const backendUrl = process.env.BACKEND_URL || 'https://tesis-rsl-backend.onrender.com';
+                    // Convertir a URLs relativas para que funcionen tras el proxy del frontend (o absolutas dinámicamente)
+                    // No incluir process.env.BACKEND_URL para evitar problemas CORS / Docker en production
+                    const baseUrl = '';
                     
                     // Cache-busting: agregar timestamp para evitar que el navegador use versiones antiguas
                     const timestamp = Date.now();
                     
                     const urls = {};
                     // Gráficos originales
-                    if (results.prisma) urls.prisma = `${backendUrl}/uploads/charts/${results.prisma}?t=${timestamp}`;
-                    if (results.scree) urls.scree = `${backendUrl}/uploads/charts/${results.scree}?t=${timestamp}`;
-                    if (results.chart1) urls.chart1 = `${backendUrl}/uploads/charts/${results.chart1}?t=${timestamp}`;
+                    if (results.prisma) urls.prisma = `${baseUrl}/uploads/charts/${results.prisma}?t=${timestamp}`;
+                    if (results.scree) urls.scree = `${baseUrl}/uploads/charts/${results.scree}?t=${timestamp}`;
+                    if (results.chart1) urls.chart1 = `${baseUrl}/uploads/charts/${results.chart1}?t=${timestamp}`;
                     
                     // 4 Nuevos gráficos académicos
                     if (results.temporal_distribution) {
-                        urls.temporal_distribution = `${backendUrl}/uploads/charts/${results.temporal_distribution}?t=${timestamp}`;
+                        urls.temporal_distribution = `${baseUrl}/uploads/charts/${results.temporal_distribution}?t=${timestamp}`;
                     }
                     if (results.quality_assessment) {
-                        urls.quality_assessment = `${backendUrl}/uploads/charts/${results.quality_assessment}?t=${timestamp}`;
+                        urls.quality_assessment = `${baseUrl}/uploads/charts/${results.quality_assessment}?t=${timestamp}`;
                     }
                     if (results.bubble_chart) {
-                        urls.bubble_chart = `${backendUrl}/uploads/charts/${results.bubble_chart}?t=${timestamp}`;
+                        urls.bubble_chart = `${baseUrl}/uploads/charts/${results.bubble_chart}?t=${timestamp}`;
                     }
                     if (results.technical_synthesis) {
-                        urls.technical_synthesis = `${backendUrl}/uploads/charts/${results.technical_synthesis}?t=${timestamp}`;
+                        urls.technical_synthesis = `${baseUrl}/uploads/charts/${results.technical_synthesis}?t=${timestamp}`;
                     }
 
                     console.log('✅ URLs finales de gráficos (con cache-busting):', urls);

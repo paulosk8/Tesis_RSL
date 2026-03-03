@@ -53,78 +53,62 @@ def save_figure(fig, output_path, **kwargs):
 
 def draw_prisma(data, output_path):
     """
-    PRISMA 2020 Flow Diagram Ã¢â‚¬â€ Based on Page et al., 2021 standard.
-    Colored header, phase labels, and detailed database breakdown.
+    PRISMA 2020 Flow Diagram — Pixel-perfect match to standard template.
     """
-    print(f"Ã°Å¸â€Â DEBUG Python - Received data keys: {data.keys()}", file=sys.stderr)
-    print(f"Ã°Å¸â€Â DEBUG Python - databases value: {data.get('databases', [])}", file=sys.stderr)
-    print(f"Ã°Å¸â€Â DEBUG Python - identified value: {data.get('identified', 0)}", file=sys.stderr)
-    
-    fig, ax = plt.subplots(figsize=(11, 12))
+    fig, ax = plt.subplots(figsize=(10, 10))
     ax.set_xlim(0, 100)
     ax.set_ylim(0, 100)
     ax.axis('off')
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ PRISMA 2020 Color Palette Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    HEADER_COLOR = '#f4d03f'  # Yellow/gold header
-    PHASE_IDENTIFICATION = '#5dade2'  # Blue
-    PHASE_SCREENING = '#5dade2'  # Blue
-    PHASE_INCLUDED = '#5dade2'  # Blue
-    BOX_MAIN = '#abebc6'  # Light green for main flow
-    BOX_EXCLUDED = '#fadbd8'  # Light pink for exclusions
-    BOX_EDGE = '#34495e'  # Dark gray edges
-    ARROW_COLOR = '#2c3e50'
+    # PRISMA 2020 EXACT Colors (Black and White standard)
+    HEADER_BG = '#ffffff'
+    PHASE_BG = '#ffffff'
+    BOX_BG = '#ffffff'
+    BOX_EDGE = '#000000'
+    ARROW_COLOR = '#000000'
 
-    def draw_box(x, y, w, h, text, bg_color='#ffffff', fontsize=8, align='center'):
-        """Draw a rectangular box with text."""
-        rect = FancyBboxPatch((x, y), w, h, boxstyle="square,pad=0",
-                              linewidth=1.0, edgecolor=BOX_EDGE, facecolor=bg_color)
+    # Font dictionary to mimic official Arial/Helvetica closely
+    font_kwargs = {'family': 'sans-serif', 'fontname': 'Arial', 'color': '#000000'}
+
+    def draw_box(x, y, w, h, text, bg_color=BOX_BG, fontsize=9.5, edge_lw=1.0, align='center'):
+        rect = FancyBboxPatch((x, y - h), w, h, boxstyle="square,pad=0",
+                              linewidth=edge_lw, edgecolor=BOX_EDGE, facecolor=bg_color)
         ax.add_patch(rect)
-        # Split text by newlines and draw each line
+        
+        # Helper string wrapping and alignment
         lines = text.split('\n')
-        if len(lines) == 1:
-            ax.text(x + w/2, y + h/2, text, ha='center', va='center',
-                    fontsize=fontsize, family='serif', wrap=True)
-        else:
-            # Calculate vertical spacing
-            line_spacing = fontsize * 0.30  # Proper spacing based on font size
-            total_text_height = len(lines) * line_spacing
-            # Center the text block vertically in the box
-            start_y = y + h/2 + total_text_height/2 - line_spacing/2
-            
-            for i, line in enumerate(lines):
-                ha = 'left' if align == 'left' else 'center'
-                x_pos = x + 2 if align == 'left' else x + w/2
-                y_pos = start_y - i * line_spacing
-                ax.text(x_pos, y_pos, line, ha=ha, va='center',
-                        fontsize=fontsize, family='serif')
+        line_spacing = fontsize * 0.35 + 0.5
+        total_text_height = len(lines) * line_spacing
+        start_y = (y - h/2) + total_text_height/2 - line_spacing/2
+        
+        for i, line in enumerate(lines):
+            align_x = x + w/2 if align == 'center' else x + 2
+            ha = 'center' if align == 'center' else 'left'
+            ax.text(align_x, start_y - i * line_spacing, line, ha=ha, va='center',
+                    fontsize=fontsize, **font_kwargs)
 
-    def draw_header(x, y, w, h, text):
-        """Draw yellow header bar."""
-        rect = FancyBboxPatch((x, y), w, h, boxstyle="square,pad=0",
-                              linewidth=1.2, edgecolor=BOX_EDGE, facecolor=HEADER_COLOR)
+    def draw_rounded_header(x, y, w, h, text, bg=HEADER_BG):
+        # PRISMA does not use rounded headers for the main top box usually, but we keep it flat if possible
+        rect = FancyBboxPatch((x, y - h), w, h, boxstyle="square,pad=0",
+                              linewidth=1.0, edgecolor=BOX_EDGE, facecolor=bg)
         ax.add_patch(rect)
-        ax.text(x + w/2, y + h/2, text, ha='center', va='center',
-                fontsize=9, fontweight='bold', family='serif')
+        ax.text(x + w/2, y - h/2, text, ha='center', va='center',
+                fontsize=10.5, fontweight='bold', **font_kwargs)
 
-    def draw_phase_label(x, y, w, h, label, color):
-        """Draw colored phase label on the left side."""
-        rect = FancyBboxPatch((x, y), w, h, boxstyle="square,pad=0",
-                              linewidth=1.0, edgecolor=BOX_EDGE, facecolor=color)
-        ax.add_patch(rect)
-        ax.text(x + w/2, y + h/2, label, ha='center', va='center',
-                fontsize=9, fontweight='bold', family='serif',
-                rotation=90, color='white')
+    def draw_phase(x, y, w, h, label):
+        # The phase is a text on the far left without a box bounding it
+        # Actually PRISMA template usually has just horizontal lines separating phases, or rotated text
+        ax.text(x + w/2, y - h/2, label.upper(), ha='center', va='center',
+                fontsize=11.5, fontweight='bold', rotation=90, **font_kwargs)
 
     def draw_arrow(x1, y1, x2, y2):
-        """Draw a downward arrow."""
+        # Standard flat arrow
         ax.annotate("", xy=(x2, y2), xytext=(x1, y1),
-                    arrowprops=dict(arrowstyle="-|>", color=ARROW_COLOR,
-                                    lw=1.5, mutation_scale=15))
+                    arrowprops=dict(arrowstyle="-|>", color=ARROW_COLOR, lw=1.2, mutation_scale=10))
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Data extraction Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    # Data Extract
     identified = data.get('identified', 0)
-    databases = data.get('databases', [])  # List of {name, hits}
+    databases = data.get('databases', [])
     duplicates = data.get('duplicates', 0)
     screened = data.get('screened', 0)
     excluded = data.get('excluded', 0)
@@ -132,185 +116,97 @@ def draw_prisma(data, output_path):
     not_retrieved = data.get('not_retrieved', 0)
     assessed = data.get('assessed', 0)
     excluded_reasons = data.get('excluded_reasons', {})
-    screening_exclusion_reasons = data.get('screening_exclusion_reasons', {})
-    protocol_exclusion_criteria = data.get('protocol_exclusion_criteria', [])
     included = data.get('included', 0)
-    
-    # Usar excluded_fulltext si está disponible, de lo contrario calcularlo (evitando negativos)
     excluded_fulltext = data.get('excluded_fulltext', max(0, assessed - included))
-    
-    print(f"[DEBUG] DEBUG draw_prisma - identified: {identified}", file=sys.stderr)
-    print(f"[DEBUG] DEBUG draw_prisma - databases: {databases}", file=sys.stderr)
-    print(f"[DEBUG] DEBUG draw_prisma - len(databases): {len(databases)}", file=sys.stderr)
-    print(f"[DEBUG] DEBUG draw_prisma - screened: {screened}", file=sys.stderr)
-    print(f"[DEBUG] DEBUG draw_prisma - excluded: {excluded}", file=sys.stderr)
-    print(f"[DEBUG] DEBUG draw_prisma - assessed: {assessed}", file=sys.stderr)
-    print(f"[DEBUG] DEBUG draw_prisma - excluded_fulltext: {excluded_fulltext}", file=sys.stderr)
-    print(f"[DEBUG] DEBUG draw_prisma - included: {included}", file=sys.stderr)
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Layout constants Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    PHASE_X, PHASE_W = 2, 7
-    MAIN_X, MAIN_W = 14, 34
-    EXCL_X, EXCL_W = 62, 32
-    CENTER = MAIN_X + MAIN_W / 2
-    GAP = 6
+    # --- PIXEL PERFECT LAYOUT (Top-Left Coordinates) ---
+    TOP_Y = 96
+    
+    PHASE_X = 1
+    PHASE_W = 6
+    
+    MAIN_X = 9
+    MAIN_W = 38
+    MAIN_CENTER = MAIN_X + MAIN_W / 2
+    
+    SIDE_X = 54
+    SIDE_W = 44
+    
+    GAP_Y = 6
+    BOX_H = 10
 
-    y = 94  # Start from top
+    # 1. HEADER
+    draw_rounded_header(MAIN_X, TOP_Y, SIDE_X+SIDE_W-MAIN_X, 4, 'Identification of new studies via databases and registers')
+    
+    # Draw horizontal phase lines (Official PRISMA uses these to segment the left column)
+    # ax.plot([0, 100], [TOP_Y - 4 - 2, TOP_Y - 4 - 2], color="black", lw=1.0)
+    
+    # 2. IDENTIFICATION
+    id_y = TOP_Y - 6
+    id_h = BOX_H + 2
+    id_text = f"Records identified from:\nDatabases (n = {identified})\nRegisters (n = 0)"
+    draw_box(MAIN_X, id_y, MAIN_W, id_h, id_text, align='left')
+    
+    id_side_text = f"Records removed before screening:\nDuplicate records removed\n(n = {duplicates})\nRecords marked as ineligible\nby automation tools (n = 0)\nRecords removed for other\nreasons (n = 0)"
+    draw_box(SIDE_X, id_y, SIDE_W, id_h, id_side_text, align='left')
+    
+    draw_arrow(MAIN_X + MAIN_W, id_y - id_h/2, SIDE_X, id_y - id_h/2)
+    draw_phase(PHASE_X, id_y, PHASE_W, id_h, "Identification")
+    
+    draw_arrow(MAIN_CENTER, id_y - id_h, MAIN_CENTER, id_y - id_h - GAP_Y)
 
-    # Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â YELLOW HEADER Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-    draw_header(MAIN_X, y, MAIN_W, 3, 'New studies via databases and registers')
-    y -= 4
+    # 3. SCREENING - Part 1
+    scr_y = id_y - id_h - GAP_Y
+    scr_h = BOX_H - 2
+    draw_box(MAIN_X, scr_y, MAIN_W, scr_h, f"Records screened\n(n = {screened})", align='left')
+    draw_box(SIDE_X, scr_y, SIDE_W, scr_h, f"Records excluded\n(n = {excluded})", align='left')
+    draw_arrow(MAIN_X + MAIN_W, scr_y - scr_h/2, SIDE_X, scr_y - scr_h/2)
+    draw_arrow(MAIN_CENTER, scr_y - scr_h, MAIN_CENTER, scr_y - scr_h - GAP_Y)
 
-    # Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â IDENTIFICATION PHASE Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-    # Calculate height based on number of databases
-    id_box_h = max(10, 5 + len(databases) * 1.2)
-    draw_phase_label(PHASE_X, y - id_box_h, PHASE_W, id_box_h + 3, 'Identification', PHASE_IDENTIFICATION)
-    
-    # Main identification box with database breakdown
-    id_text_lines = []
-    if databases and len(databases) > 0:
-        id_text_lines.append('Records identified from:')
-        for db in databases:
-            db_name = db.get('name', 'Unknown')
-            db_hits = db.get('hits', 0)
-            id_text_lines.append(f'  {db_name} (n = {db_hits})')
-    else:
-        id_text_lines.append('Records identified from')
-        id_text_lines.append('database searches')
-    id_text_lines.append(f'\nTotal records (n = {identified})')
-    
-    draw_box(MAIN_X, y - id_box_h, MAIN_W, id_box_h, '\n'.join(id_text_lines), 
-             bg_color=BOX_MAIN, fontsize=7.5, align='left')
-    
-    # Records removed before screening (side box)
-    removed_h = 8
-    removed_y = y - id_box_h/2 - removed_h/2
-    removed_text = 'Records removed before screening:\n\n'
-    removed_text += f'  Duplicate records (n = {duplicates})\n'
-    # removed_text += f'  Records marked as ineligible (n = 0)\n'
-    # removed_text += f'  Other reasons (n = 0)'
-    draw_box(EXCL_X, removed_y, EXCL_W, removed_h, removed_text, 
-             bg_color=BOX_EXCLUDED, fontsize=7, align='left')
-    
-    # Arrow from identification to removed box
-    ax.plot([MAIN_X + MAIN_W, EXCL_X], [y - id_box_h/2, removed_y + removed_h/2],
-            color=ARROW_COLOR, linewidth=1.2)
-    
-    y -= id_box_h + GAP
-    draw_arrow(CENTER, y + GAP - 1, CENTER, y + 1)
+    # 4. RETRIEVAL - Part 2
+    retr_y = scr_y - scr_h - GAP_Y
+    retr_h = BOX_H - 2
+    draw_box(MAIN_X, retr_y, MAIN_W, retr_h, f"Reports sought for retrieval\n(n = {retrieved})", align='left')
+    draw_box(SIDE_X, retr_y, SIDE_W, retr_h, f"Reports not retrieved\n(n = {not_retrieved})", align='left')
+    draw_arrow(MAIN_X + MAIN_W, retr_y - retr_h/2, SIDE_X, retr_y - retr_h/2)
+    draw_arrow(MAIN_CENTER, retr_y - retr_h, MAIN_CENTER, retr_y - retr_h - GAP_Y)
 
-    # Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â SCREENING PHASE Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-    scr_h = 8
-    draw_phase_label(PHASE_X, y - scr_h, PHASE_W, scr_h + 3, 'Screening', PHASE_SCREENING)
+    # 5. ELIGIBILITY - Part 3
+    elig_y = retr_y - retr_h - GAP_Y
+    elig_h = BOX_H + 4
+    draw_box(MAIN_X, elig_y, MAIN_W, elig_h, f"Reports assessed for eligibility\n(n = {assessed})", align='left')
     
-    scr_text = f'Records screened\n(title and abstract)\n(n = {screened})'
-    draw_box(MAIN_X, y - scr_h, MAIN_W, scr_h, scr_text, bg_color=BOX_MAIN, fontsize=8)
-    
-    # Excluded records (side) with breakdown by reasons
-    exc_scr_h = 6
-    exc_scr_y = y - scr_h/2 - exc_scr_h/2
-    
-    if screening_exclusion_reasons and len(screening_exclusion_reasons) > 0:
-        exc_lines = [f'Records excluded (n = {excluded})']
-        exc_lines.append('')
-        for reason, count in screening_exclusion_reasons.items():
-            exc_lines.append(f'  {reason} (n = {count})')
-        exc_scr_h = max(6, len(exc_lines) * 1.3 + 3)
-        exc_scr_y = y - scr_h/2 - exc_scr_h/2
-        draw_box(EXCL_X, exc_scr_y, EXCL_W, exc_scr_h, '\n'.join(exc_lines),
-                 bg_color=BOX_EXCLUDED, fontsize=7, align='left')
-    else:
-        exc_text = f'Records excluded\n(n = {excluded})'
-        draw_box(EXCL_X, exc_scr_y, EXCL_W, exc_scr_h, exc_text, 
-                 bg_color=BOX_EXCLUDED, fontsize=7.5)
-    ax.plot([MAIN_X + MAIN_W, EXCL_X], [y - scr_h/2, exc_scr_y + exc_scr_h/2],
-            color=ARROW_COLOR, linewidth=1.2)
-    
-    y -= scr_h + GAP
-    draw_arrow(CENTER, y + GAP - 1, CENTER, y + 1)
-
-    # Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â REPORTS SOUGHT FOR RETRIEVAL Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-    retr_h = 7
-    retr_text = f'Reports sought for retrieval\n(n = {retrieved})'
-    draw_box(MAIN_X, y - retr_h, MAIN_W, retr_h, retr_text, bg_color=BOX_MAIN, fontsize=8)
-    
-    # Not retrieved (side)
-    if not_retrieved > 0:
-        nr_h = 5
-        nr_y = y - retr_h/2 - nr_h/2
-        nr_text = f'Reports not retrieved\n(n = {not_retrieved})'
-        draw_box(EXCL_X, nr_y, EXCL_W, nr_h, nr_text, 
-                 bg_color=BOX_EXCLUDED, fontsize=7.5)
-        ax.plot([MAIN_X + MAIN_W, EXCL_X], [y - retr_h/2, nr_y + nr_h/2],
-                color=ARROW_COLOR, linewidth=1.2)
-    
-    y -= retr_h + GAP
-    draw_arrow(CENTER, y + GAP - 1, CENTER, y + 1)
-
-    # Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â ELIGIBILITY (Reports assessed) Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-    assess_h = 7
-    assess_text = f'Reports assessed for eligibility\n(n = {assessed})'
-    draw_box(MAIN_X, y - assess_h, MAIN_W, assess_h, assess_text, bg_color=BOX_MAIN, fontsize=8)
-    
-    # Excluded with reasons (side) - usar excluded_fulltext ya calculado
-    total_exc = excluded_fulltext
-    exc_reasons_lines = []
-    
+    exc_lines = [f"Reports excluded:"]
     if excluded_reasons and len(excluded_reasons) > 0:
-        # Format: Excluded (n=X) then list reasons
-        exc_reasons_lines.append(f'Reports excluded (n = {total_exc})')
-        exc_reasons_lines.append('')  # blank line
         for reason, count in excluded_reasons.items():
-            exc_reasons_lines.append(f'  {reason} (n = {count})')
-    elif protocol_exclusion_criteria and len(protocol_exclusion_criteria) > 0:
-        # Show protocol criteria with n=0 each
-        exc_reasons_lines.append(f'Reports excluded (n = {total_exc})')
-        exc_reasons_lines.append('')
-        for criteria in protocol_exclusion_criteria:
-            exc_reasons_lines.append(f'  {criteria} (n = 0)')
+            exc_lines.append(f"  {reason[:30]} (n = {count})")
     else:
-        if total_exc > 0:
-            exc_reasons_lines.append(f'Reports excluded\n(n = {total_exc})')
-        else:
-            exc_reasons_lines.append(f'Reports excluded (n = 0)')
-            exc_reasons_lines.append('')
-            exc_reasons_lines.append('  No reports excluded at this stage')
-    
-    exc_ft_h = max(7, len(exc_reasons_lines) * 1.3 + 3)
-    exc_ft_y = y - assess_h/2 - exc_ft_h/2
-    draw_box(EXCL_X, exc_ft_y, EXCL_W, exc_ft_h, '\n'.join(exc_reasons_lines),
-             bg_color=BOX_EXCLUDED, fontsize=7, align='left')
-    ax.plot([MAIN_X + MAIN_W, EXCL_X], [y - assess_h/2, exc_ft_y + exc_ft_h/2],
-            color=ARROW_COLOR, linewidth=1.2)
-    
-    y -= assess_h + GAP
-    draw_arrow(CENTER, y + GAP - 1, CENTER, y + 1)
+        exc_lines.append(f"  Reason 1 (n = {max(0, excluded_fulltext - 0)})")
+        exc_lines.append("  Reason 2 (n = 0)")
+        exc_lines.append("  Reason 3 (n = 0)")
+        
+    draw_box(SIDE_X, elig_y, SIDE_W, elig_h, "\n".join(exc_lines), align='left')
+    draw_arrow(MAIN_X + MAIN_W, elig_y - elig_h/2, SIDE_X, elig_y - elig_h/2)
+    draw_arrow(MAIN_CENTER, elig_y - elig_h, MAIN_CENTER, elig_y - elig_h - GAP_Y)
 
-    # Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â INCLUDED Ã¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢ÂÃ¢â€¢Â
-    inc_h = 8
-    draw_phase_label(PHASE_X, y - inc_h, PHASE_W, inc_h + 3, 'Included', PHASE_INCLUDED)
-    
-    # Two boxes side by side for included studies
-    inc_left_w = MAIN_W / 2 - 1
-    inc1_text = f'New studies included\nin review\n(n = {included})'
-    draw_box(MAIN_X, y - inc_h, inc_left_w, inc_h, inc1_text, bg_color=BOX_MAIN, fontsize=8)
-    
-    inc2_text = f'Reports of new\nincluded studies\n(n = {included})'
-    draw_box(MAIN_X + inc_left_w + 2, y - inc_h, inc_left_w, inc_h, inc2_text, 
-             bg_color=BOX_MAIN, fontsize=8)
+    # Add phase text in middle
+    phase_scr_h = (elig_y - scr_y) + elig_h
+    draw_phase(PHASE_X, scr_y, PHASE_W, phase_scr_h, "Screening")
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Adjust visible area Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    ax.set_ylim(y - inc_h - 3, 98)
+    # 6. INCLUDED
+    inc_y = elig_y - elig_h - GAP_Y
+    inc_h = BOX_H + 2
+    draw_box(MAIN_X, inc_y, MAIN_W, inc_h, f"New studies included in review\n(n = {included})\nReports of new included studies\n(n = 0)", align='left')
+    draw_phase(PHASE_X, inc_y, PHASE_W, inc_h, "Included")
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Title Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    plt.suptitle('PRISMA 2020 Flow Diagram', fontsize=13, fontweight='bold',
-                 family='serif', y=0.98)
-    plt.figtext(0.5, 0.96, 'Study selection process according to Page et al. (2021)',
-                ha='center', fontsize=8, fontstyle='italic', family='serif', color='#555555')
+    # Add outer bounding box (optional but often seen in PRISMA left margin outline)
+    border_rect = patches.Rectangle((PHASE_X + PHASE_W + 1, inc_y - inc_h - 2), 0, (TOP_Y - (inc_y - inc_h - 2)), linewidth=1.5, edgecolor=BOX_EDGE, facecolor='none')
+    ax.add_patch(border_rect)
 
-    plt.tight_layout(rect=[0, 0.01, 1, 0.95])
+    plt.tight_layout(rect=[0, 0, 1, 1])
     save_figure(fig, output_path)
     plt.close()
+
 
 def draw_scree(data, output_path):
     """
@@ -343,20 +239,20 @@ def draw_scree(data, output_path):
 
     fig, ax = plt.subplots(figsize=(8, 5))
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Main line plot Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    # â•â•â• Main line plot â•â•â•
     ax.plot(df['Rank'], df['Score'], 'o-', color='#333333', markersize=4,
             markerfacecolor='#333333', markeredgecolor='#333333', linewidth=1.2,
-            label='Puntaje de relevancia', zorder=3)
+            label='Relevance score', zorder=3)
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Fill under curve (very subtle) Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    # â•â•â• Fill under curve (very subtle) â•â•â•
     ax.fill_between(df['Rank'], df['Score'], color='#cccccc', alpha=0.3, zorder=1)
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Median Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    # â•â•â• Median â•â•â•
     median_score = float(df['Score'].median())
     ax.axhline(y=median_score, color='#666666', linestyle='--', linewidth=0.8,
-               alpha=0.8, label=f'Mediana: {median_score:.1%}', zorder=2)
+               alpha=0.8, label=f'Median: {median_score:.1%}', zorder=2)
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Elbow (Knee) detection Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    # â•â•â• Elbow (Knee) detection â•â•â•
     x1, y1 = 1, scores[0]
     x2, y2 = len(scores), scores[-1]
     A = y1 - y2
@@ -375,34 +271,34 @@ def draw_scree(data, output_path):
 
     if elbow_idx != -1:
         ax.axvline(x=elbow_idx, color='#333333', linestyle=':', linewidth=1.0,
-                   alpha=0.7, label=f'Punto de corte (codo): rank {elbow_idx}', zorder=2)
+                   alpha=0.7, label=f'Cutoff point (elbow): rank {elbow_idx}', zorder=2)
         # Annotation arrow
         elbow_score = scores[elbow_idx - 1]
-        ax.annotate(f'Codo\n(rank = {elbow_idx})',
+        ax.annotate(f'Elbow\n(rank = {elbow_idx})',
                     xy=(elbow_idx, elbow_score),
                     xytext=(elbow_idx + max(1, len(scores)*0.08), elbow_score + 0.05),
                     fontsize=8, family='serif', fontstyle='italic',
                     arrowprops=dict(arrowstyle='->', color='#333333', lw=0.8),
                     ha='left', va='bottom')
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Quantile lines Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
+    # â•â•â• Quantile lines â•â•â•
     top_10_idx = max(1, int(len(scores) * 0.1))
     top_25_idx = max(1, int(len(scores) * 0.25))
 
     if top_10_idx <= len(scores):
         s10 = scores[top_10_idx - 1]
         ax.axhline(y=s10, color='#999999', linestyle='-.', linewidth=0.7,
-                   alpha=0.6, label=f'Top 10% (Ã¢â€°Â¥ {s10:.2f})')
+                   alpha=0.6, label=f'Top 10% (â‰¥ {s10:.2f})')
 
     if top_25_idx <= len(scores):
         s25 = scores[top_25_idx - 1]
         ax.axhline(y=s25, color='#999999', linestyle=':', linewidth=0.7,
-                   alpha=0.6, label=f'Top 25% (Ã¢â€°Â¥ {s25:.2f})')
+                   alpha=0.6, label=f'Top 25% (â‰¥ {s25:.2f})')
 
-    # Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬ Axes formatting Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
-    ax.set_xlabel('Rango de referencia', fontsize=11, family='serif')
-    ax.set_ylabel('Puntaje de relevancia', fontsize=11, family='serif')
-    ax.set_title('DistribuciÃƒÂ³n de puntajes de cribado por prioridad (Scree Plot)',
+    # â•â•â• Axes formatting â•â•â•
+    ax.set_xlabel('Reference Rank', fontsize=11, family='serif')
+    ax.set_ylabel('Relevance Score', fontsize=11, family='serif')
+    ax.set_title('Priority Screening Score Distribution (Scree Plot)',
                  fontsize=12, fontweight='bold', family='serif', pad=12)
 
     # Academic grid style
@@ -433,10 +329,10 @@ def draw_search_table(data, output_path):
     import textwrap
 
     table_data = []
-    col_labels = ['Fuente', 'Resultados', 'Cadena de bÃƒÂºsqueda']
+    col_labels = ['Source', 'Hits', 'Search Query']
 
     for item in data:
-        name = item.get('name', 'Desconocido')
+        name = item.get('name', 'Unknown')
         hits = item.get('hits', 0)
         query = item.get('searchString', '') or 'N/A'
         wrapped_query = textwrap.fill(query, width=55)
@@ -450,7 +346,7 @@ def draw_search_table(data, output_path):
     ax.axis('off')
     ax.axis('tight')
 
-    ax.set_title("Tabla 1. Fuentes de datos y resultados de la estrategia de bÃƒÂºsqueda",
+    ax.set_title("Table 1. Data Sources and Search Strategy Results",
                  fontsize=11, fontweight='bold', family='serif', pad=15)
 
     table = ax.table(cellText=table_data, colLabels=col_labels,
@@ -487,9 +383,9 @@ def draw_temporal_distribution(data, output_path):
     years_data = data.get('years', {})  # { '2019': 2, '2020': 5, '2021': 8, ... }
     
     if not years_data or len(years_data) == 0:
-        print("Ã¢Å¡Â Ã¯Â¸Â  No hay datos temporales disponibles", file=sys.stderr)
+        print("Ã¢Å¡Â Ã¯Â¸Â   No temporal data available", file=sys.stderr)
         fig, ax = plt.subplots(figsize=(10, 5))
-        ax.text(0.5, 0.5, 'No hay datos de distribuciÃƒÂ³n temporal disponibles',
+        ax.text(0.5, 0.5, 'No temporal distribution data available',
                 ha='center', va='center', fontsize=12, color='#666666', family='serif')
         ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis('off')
         save_figure(fig, output_path)
@@ -518,11 +414,11 @@ def draw_temporal_distribution(data, output_path):
         p = np.poly1d(z)
         years_smooth = np.linspace(min(years), max(years), 100)
         ax.plot(years_smooth, p(years_smooth), '--', color='#e74c3c', linewidth=2, 
-                alpha=0.7, label='Tendencia')
+                alpha=0.7, label='Trend')
     
-    ax.set_xlabel('AÃƒÂ±o de publicaciÃƒÂ³n', fontsize=11, family='serif')
-    ax.set_ylabel('NÃƒÂºmero de estudios', fontsize=11, family='serif')
-    ax.set_title('DistribuciÃƒÂ³n Temporal de Estudios Incluidos', 
+    ax.set_xlabel('Publication Year', fontsize=11, family='serif')
+    ax.set_ylabel('Number of Studies', fontsize=11, family='serif')
+    ax.set_title('Temporal Distribution of Included Studies', 
                  fontsize=12, fontweight='bold', family='serif', pad=12)
     
     # Format x-axis to show all years
@@ -560,9 +456,9 @@ def draw_quality_assessment(data, output_path):
     partial_counts = data.get('partial', [])
     
     if not questions or len(questions) == 0:
-        print("Ã¢Å¡Â Ã¯Â¸Â  No hay datos de evaluaciÃƒÂ³n de calidad disponibles", file=sys.stderr)
+        print("Ã¢Å¡Â Ã¯Â¸Â   No quality assessment data available", file=sys.stderr)
         fig, ax = plt.subplots(figsize=(10, 5))
-        ax.text(0.5, 0.5, 'No hay datos de evaluaciÃƒÂ³n de calidad disponibles',
+        ax.text(0.5, 0.5, 'No quality assessment data available',
                 ha='center', va='center', fontsize=12, color='#666666', family='serif')
         ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis('off')
         save_figure(fig, output_path)
@@ -575,8 +471,8 @@ def draw_quality_assessment(data, output_path):
     width = 0.6
     
     # Stacked bars
-    p1 = ax.bar(x, yes_counts, width, label='SÃƒÂ­', color='#27ae60', alpha=0.9, edgecolor='#333333', linewidth=0.5)
-    p2 = ax.bar(x, partial_counts, width, bottom=yes_counts, label='Parcial', 
+    p1 = ax.bar(x, yes_counts, width, label='Yes', color='#27ae60', alpha=0.9, edgecolor='#333333', linewidth=0.5)
+    p2 = ax.bar(x, partial_counts, width, bottom=yes_counts, label='Partial', 
                 color='#f39c12', alpha=0.9, edgecolor='#333333', linewidth=0.5)
     
     # Calculate bottom for 'No' bars
@@ -594,9 +490,9 @@ def draw_quality_assessment(data, output_path):
                         ha='center', va='center', fontsize=8, family='serif', 
                         color='white', fontweight='bold')
     
-    ax.set_xlabel('Criterios de Calidad (Kitchenham)', fontsize=11, family='serif')
-    ax.set_ylabel('NÃƒÂºmero de Estudios', fontsize=11, family='serif')
-    ax.set_title('EvaluaciÃƒÂ³n de Calidad MetodolÃƒÂ³gica', 
+    ax.set_xlabel('Quality Criteria (Kitchenham)', fontsize=11, family='serif')
+    ax.set_ylabel('Number of Studies', fontsize=11, family='serif')
+    ax.set_title('Methodological Quality Assessment', 
                  fontsize=12, fontweight='bold', family='serif', pad=12)
     ax.set_xticks(x)
     ax.set_xticklabels(questions, rotation=0, ha='center', fontsize=9)
@@ -685,9 +581,9 @@ def draw_bubble_chart(data, output_path):
                     ha='center', va='center', fontsize=9, family='serif', 
                     fontweight='bold', color='white')
     
-    ax.set_xlabel('MÃƒÂ©tricas de Rendimiento', fontsize=11, family='serif')
-    ax.set_ylabel('Herramientas/TecnologÃƒÂ­as', fontsize=11, family='serif')
-    ax.set_title('Mapeo de Dimensiones: MÃƒÂ©tricas vs Herramientas\n(TamaÃƒÂ±o = NÃƒÂºmero de Estudios)', 
+    ax.set_xlabel('Performance Metrics', fontsize=11, family='serif')
+    ax.set_ylabel('Tools/Technologies', fontsize=11, family='serif')
+    ax.set_title('Dimension Mapping: Metrics vs Tools\n(Size = Number of Studies)', 
                  fontsize=12, fontweight='bold', family='serif', pad=12)
     
     ax.set_xticks(range(len(metrics)))
@@ -755,9 +651,9 @@ def draw_technical_synthesis(data, output_path):
     col_labels = []
     for col in display_cols:
         if col == 'study':
-            col_labels.append('Estudio')
+            col_labels.append('Study')
         elif col == 'tool':
-            col_labels.append('Herramienta')
+            col_labels.append('Tool')
         else:
             # Generic formatting: capitalize and replace underscores
             formatted = col.replace('_', ' ').title()
@@ -769,7 +665,7 @@ def draw_technical_synthesis(data, output_path):
     ax.axis('off')
     ax.axis('tight')
     
-    ax.set_title("SÃƒÂ­ntesis TÃƒÂ©cnica: ComparaciÃƒÂ³n de MÃƒÂ©tricas de Rendimiento",
+    ax.set_title("Technical Synthesis: Performance Metrics Comparison",
                  fontsize=12, fontweight='bold', family='serif', pad=15)
     
     # Convert DataFrame to list of lists
