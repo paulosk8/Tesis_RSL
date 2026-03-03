@@ -176,6 +176,9 @@ class PythonGraphService {
                     if (results.technical_synthesis) {
                         urls.technical_synthesis = `${baseUrl}/uploads/charts/${results.technical_synthesis}?t=${timestamp}`;
                     }
+                    if (results.keyword_concentration) {
+                        urls.keyword_concentration = `${baseUrl}/uploads/charts/${results.keyword_concentration}?t=${timestamp}`;
+                    }
 
                     console.log('✅ URLs finales de gráficos (con cache-busting):', urls);
                     resolve(urls);

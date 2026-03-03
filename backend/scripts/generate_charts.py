@@ -346,7 +346,7 @@ def draw_search_table(data, output_path):
     ax.axis('off')
     ax.axis('tight')
 
-    ax.set_title("Table 1. Data Sources and Search Strategy Results",
+    ax.set_title("Data Sources and Search Strategy Results",
                  fontsize=11, fontweight='bold', family='serif', pad=15)
 
     table = ax.table(cellText=table_data, colLabels=col_labels,
@@ -699,6 +699,57 @@ def draw_technical_synthesis(data, output_path):
     save_figure(fig, output_path)
     plt.close()
 
+def draw_keyword_concentration(data, output_path):
+    """
+    Keyword Concentration (Horizontal Bar Chart).
+    Shows frequency of technical terms across included studies.
+    Identifies thematic focus.
+    """
+    keywords_data = data.get('keywords', {})
+    
+    if not keywords_data or len(keywords_data) == 0:
+        print("⚠  No keyword data available", file=sys.stderr)
+        fig, ax = plt.subplots(figsize=(10, 6))
+        ax.text(0.5, 0.5, 'No keyword concentration data available',
+                ha='center', va='center', fontsize=12, color='#666666', family='serif')
+        ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis('off')
+        save_figure(fig, output_path)
+        plt.close()
+        return
+    
+    # Sort and take top
+    sorted_items = sorted(keywords_data.items(), key=lambda x: x[1]) # Ascending for horizontal bar
+    words = [item[0].capitalize() for item in sorted_items]
+    counts = [item[1] for item in sorted_items]
+    
+    fig, ax = plt.subplots(figsize=(10, 7))
+    
+    # Horizontal bar chart
+    y_pos = np.arange(len(words))
+    bars = ax.barh(y_pos, counts, color='#2c3e50', alpha=0.85, edgecolor='#34495e', linewidth=0.8)
+    
+    # Add value labels
+    for i, v in enumerate(counts):
+        ax.text(v + 0.1, i, str(v), color='#333333', va='center', fontsize=10, fontweight='bold', family='serif')
+    
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(words, fontsize=11, family='serif')
+    ax.set_xlabel('Frequency (Count)', fontsize=11, family='serif')
+    ax.set_title('Technical Keyword Concentration (Thematic Mapping)', 
+                 fontsize=13, fontweight='bold', family='serif', pad=15)
+    
+    # Grid
+    ax.grid(True, axis='x', linestyle='--', linewidth=0.3, alpha=0.4, color='#95a5a6')
+    ax.set_axisbelow(True)
+    
+    # Clean spines
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    
+    plt.tight_layout()
+    save_figure(fig, output_path)
+    plt.close()
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--output-dir', required=True, help='Directory to save charts')
@@ -762,7 +813,13 @@ def main():
         synthesis_path = os.path.join(args.output_dir, 'technical_synthesis.png')
         draw_technical_synthesis(input_data['technical_synthesis'], synthesis_path)
         results['technical_synthesis'] = 'technical_synthesis.png'
-        print("Ã¢Å“â€¦ Tabla de sÃƒÂ­ntesis tÃƒÂ©cnica generada", file=sys.stderr)
+        print("✅ Tabla de síntesis técnica generada", file=sys.stderr)
+
+    if 'keyword_concentration' in input_data:
+        kw_path = os.path.join(args.output_dir, 'keyword_concentration.png')
+        draw_keyword_concentration(input_data['keyword_concentration'], kw_path)
+        results['keyword_concentration'] = 'keyword_concentration.png'
+        print("✅ Gráfico de concentración de keywords generado", file=sys.stderr)
 
     print(json.dumps(results))
 
