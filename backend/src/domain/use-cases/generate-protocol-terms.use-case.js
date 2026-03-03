@@ -53,9 +53,11 @@ class GenerateProtocolTermsUseCase {
         try {
           const model = this.gemini.getGenerativeModel({
             model: "gemini-2.5-pro",
+            systemInstruction: "Eres un experto en Bibliometría y Revisiones Sistemáticas (RSL) bajo estándares PRISMA 2020. Respondes ÚNICAMENTE en formato JSON válido.",
             generationConfig: {
               temperature: 0.4,
-              maxOutputTokens: 800
+              maxOutputTokens: 8192,
+              responseMimeType: "application/json"
             }
           });
           const result = await model.generateContent(prompt);
@@ -133,7 +135,7 @@ class GenerateProtocolTermsUseCase {
 
     return `
 Eres un experto en Bibliometría y Revisiones Sistemáticas (RSL) bajo estándares PRISMA 2020.
-Tu objetivo es generar términos de búsqueda bilingües (ES-EN) para construir cadenas booleanas en bases académicas.
+Tu objetivo es generar términos de búsqueda bilingües (ES-EN) para construir cadenas booleanas en bases académicas, garantizando alto nivel de Recall (Sensibilidad).
 
 RESPONDE ÚNICAMENTE con JSON válido (sin texto adicional, sin markdown, sin comentarios).
 
@@ -154,70 +156,57 @@ Matriz ES (Inclusión): ${isIncluded.length ? isIncluded.join(' | ') : 'No defin
 Matriz NO ES (Exclusión): ${isNotIncluded.length ? isNotIncluded.join(' | ') : 'No definida'}
 
 ═══════════════════════════════════════════════════════════════
-INSTRUCCIONES DE GENERACIÓN
+INSTRUCCIONES DE GENERACIÓN (NUEVO PROTOCOLO DE RECALL)
 ═══════════════════════════════════════════════════════════════
 
-OBJETIVO: Maximizar la SENSIBILIDAD (Recall). Debemos encontrar TODOS los papers relevantes, incluso si usan terminología diferente.
+1. **Expansión de Sinónimos Técnicos (technologies)**:
+   - Deriva de PICO-I: "${I}" y PICO-C: "${C}" 
+   - ⚠️ REGLA CRÍTICA: Identifica tecnologías e INCLUYE SIEMPRE sus acrónimos y variantes de la industria.
+   - Ejemplo: Si la tecnología es "Object Relational Mapping", añade "ORM". Si es "Object Document Mapper", añade "ODM".
 
-Genera 3 categorías de términos derivados del TÍTULO y del PICO ya validado:
+2. **Dominio de Aplicación (applicationDomain)**:
+   - Deriva de PICO-P: "${P}"
+   - Keywords MUY cortas y específicas sobre el ecosistema técnico o dominio de estudio.
 
-1. **technologies** (4-6 términos CLAVE) — Basado en PICO-I: "${I}"
-   - SOLO nombres propios técnicos y conceptos clave específicos.
-   - ❌ NO atomizar: Si es "MongoDB" → incluir "MongoDB", NO "Mongoose", "Schema", "Collection" como términos separados.
-   - ✅ PREFERIR: Tecnologías/frameworks principales mencionados explícitamente en PICO-I.
-   - Ejemplo: Si PICO-I dice "MongoDB como ODM" → términos: "MongoDB", "ODM", "NoSQL Database".
-   - ❌ EVITAR términos amplios: "Database", "Software", "Technology", "System".
-   - **NOMBRES PROPIOS TÉCNICOS NO SE TRADUCEN**: "MongoDB - MongoDB", "Mongoose - Mongoose".
+3. **Inclusión de Metodologías de Medición (thematicFocus)**:
+   - Deriva de PICO-O: "${O}"
+   - ⚠️ OBLIGATORIO: Además de las métricas (ej. Latency, Throughput), INCLUYE términos relacionados con la obtención empírica de datos.
+   - Ejemplos obligatorios a considerar: "Benchmark", "Benchmarking", "Empirical Study", "Comparative Study", "Performance Evaluation".
 
-2. **applicationDomain** (3-5 términos CLAVE) — Basado en PICO-P: "${P}"
-   - Contexto/dominio específico DONDE se aplica (del PICO-P).
-   - ¡CRÍTICO! KEYWORDS CORTAS (1-3 palabras máximo) y ESPECÍFICAS.
-   - ❌ EVITAR frases largas: "Interacción con...", "Sistemas que utilizan...".
-   - ❌ EVITAR términos muy amplios: "Software", "Technology", "Engineering".
-   - ✅ PREFERIR términos concretos: "Backend Systems", "Node.js Applications", "RESTful APIs".
-   - Incluir variantes técnicas si aplica (ej: "Web Services", "Microservices").
-   - NO incluir variables medibles aquí.
+4. **Prioridad Lingüística (Inglés Técnico)**:
+   - Genera siempre una versión en **Inglés Técnico de alta fidelidad** (escala global de indexación).
+   - Formato de respuesta por elemento: "Término en Español - Technical Term in English".
+   - Marcas registradas NO se traducen ("MongoDB - MongoDB").
 
-3. **thematicFocus** (4-6 términos CLAVE, OBLIGATORIO) — Basado en PICO-O: "${O}"
-   - Variables/métricas específicas que se miden (responde "¿Qué se evalúa exactamente?").
-   - DEBE incluir los outcomes ESPECÍFICOS del PICO-O (ej: "Query Performance", "Response Time").
-   - ❌ EVITAR términos muy amplios: "Performance" solo, "Efficiency" solo, "Quality" solo.
-   - ✅ PREFERIR términos compuestos específicos: "Query Performance", "Developer Productivity", "Code Maintainability".
-   - Si es comparativo, incluir "Comparative Analysis", "Trade-off Analysis".
-
-REGLA CLAVE: 
-- Nombres propios técnicos (MongoDB, React, Docker) → NO traducir, usar "Término - Término".
-- Conceptos técnicos (Base de datos, Rendimiento) → traducir "Español - English".
-- EVITAR atomización: 4-6 términos clave por categoría, NO listas exhaustivas de sinónimos.
+5. **Adaptación Multidisciplinaria**:
+   - Si detectas **Ingeniería**: Asegura la presencia de términos de arquitectura y eficiencia ("Overhead", "Throughput", "Latency", "Scalability").
+   - Si detectas **Ciencias de la Salud/Sociales**: Asegura la presencia de validez y metodologías clínicas ("Control Group", "Randomized Trial", "Clinical Efficacy", "Psychometric Properties").
 
 ═══════════════════════════════════════════════════════════════
-FORMATO DE SALIDA (JSON ESTRICTO)
+NORMALIZACIÓN PARA BÚSQUEDA BOOLEANA Y FORMATO JSON
 ═══════════════════════════════════════════════════════════════
 
-- Formato BILINGÜE en una sola línea: "Español - English" (español primero)
-- **NOMBRES PROPIOS TÉCNICOS**: usar el mismo término en ambos lados ("MongoDB - MongoDB", "React - React")
-- **CONCEPTOS TÉCNICOS**: traducir cuando sea relevante ("Base de datos - Database", "Rendimiento - Performance")
-- Máximo 4 palabras por idioma
-- Términos ESPECÍFICOS, NO genéricos
-- Términos buscables en bases académicas (Scopus, IEEE, WoS, ACM)
+- Los términos deben ser mutuamente excluyentes entre categorías para usarse como grupos AND en la búsqueda, mientras operan con OR dentro de la lista.
+- Formato BILINGÜE: "Español - English" (español primero)
+- Máximo 4-5 palabras por idioma.
+- Extrae exactamente 4 a 6 términos por categoría.
 
 {
   "technologies": [
-    "Término 1 ES - Term 1 EN",
-    "Término 2 ES - Term 2 EN",
-    "Término 3 ES - Term 3 EN",
-    "Término 4 ES - Term 4 EN"
+    "Mapeo Objeto-Documento - Object Document Mapping (ODM)",
+    "Controlador Nativo - Native Driver",
+    "MongoDB - MongoDB"
   ],
   "applicationDomain": [
-    "Dominio 1 ES - Domain 1 EN",
-    "Dominio 2 ES - Domain 2 EN",
-    "Dominio 3 ES - Domain 3 EN"
+    "Sistemas Backend - Backend Systems",
+    "Aplicaciones Node.js - Node.js Applications"
   ],
   "thematicFocus": [
-    "Foco 1 ES - Focus 1 EN",
-    "Foco 2 ES - Focus 2 EN",
-    "Foco 3 ES - Focus 3 EN",
-    "Foco 4 ES - Focus 4 EN"
+    "Evaluación de Rendimiento - Performance Evaluation",
+    "Prueba de Referencia - Benchmark",
+    "Estudio Comparativo - Comparative Study",
+    "Latencia - Latency",
+    "Rendimiento del Sistema - System Throughput"
   ]
 }
 
@@ -239,7 +228,7 @@ RESPONDE SOLO CON EL JSON. NADA MÁS.
     const jsonKey = sectionNames[specificSection] || specificSection;
 
     return `
-Eres un experto en metodología PRISMA para revisiones sistemáticas. Tu tarea: regenerar ÚNICAMENTE la sección "${jsonKey}" con enfoque personalizado.
+Eres un experto en metodología PRISMA para revisiones sistemáticas. Tu tarea: regenerar ÚNICAMENTE la sección "${jsonKey}" con enfoque personalizado, maximizando el Recall (Sensibilidad).
 
 RESPONDE ÚNICAMENTE con JSON válido (sin texto adicional, sin markdown, sin comentarios).
 
@@ -258,19 +247,18 @@ Matriz NO ES: ${isNotIncluded.join(' | ')}
 ENFOQUE PERSONALIZADO DEL USUARIO: ${customFocus}
 
 REGLAS PARA "${jsonKey}":
-${jsonKey === 'technologies' ? `- Derivar de PICO-I: "${I}"
+${jsonKey === 'technologies' ? `- Deriva de PICO-I: "${I}" y PICO-C: "${C}"
+- ⚠️ REGLA CRÍTICA: Identifica tecnologías e INCLUYE SIEMPRE sus acrónimos (ej. Object Relational Mapping → ORM).
 - 4-6 términos CLAVE: nombres propios técnicos específicos.
-- ❌ NO atomizar: MongoDB (SÍ), Mongoose/Schema/Collection como términos separados (NO).
 - Nombres propios técnicos NO se traducen: "MongoDB - MongoDB".` : ''}
-${jsonKey === 'applicationDomain' ? `- Derivar de PICO-P: "${P}"
+${jsonKey === 'applicationDomain' ? `- Deriva de PICO-P: "${P}"
 - 3-5 términos ESPECÍFICOS: contexto/dominio DONDE se aplica.
 - ¡KEYWORDS CORTAS! (Backend Systems, Node.js, RESTful APIs).
 - ❌ EVITAR términos amplios: "Software", "Technology", "Engineering".` : ''}
-${jsonKey === 'thematicFocus' ? `- Derivar de PICO-O: "${O}"
+${jsonKey === 'thematicFocus' ? `- Deriva de PICO-O: "${O}"
 - 4-6 métricas ESPECÍFICAS que respondan "¿Qué se mide exactamente?"
-- ✅ Términos compuestos específicos: "Query Performance", "Developer Productivity".
-- ❌ EVITAR términos solos muy amplios: "Performance" solo, "Efficiency" solo.
-- NUNCA dejar vacío.` : ''}
+- ⚠️ OBLIGATORIO: INCLUYE términos relacionados con la obtención empírica de datos (ej. "Benchmark", "Empirical Study", "Performance Evaluation").
+- Adaptativo: Para ingeniería usa "Overhead", "Throughput". Para salud usa "Randomized Trial", "Efficacy".` : ''}
 
 FORMATO JSON (devolver las 3 categorías, solo "${jsonKey}" será usada):
 {
@@ -279,8 +267,8 @@ FORMATO JSON (devolver las 3 categorías, solo "${jsonKey}" será usada):
   "thematicFocus": ["Español - English", ...]
 }
 
-- Formato BILINGÜE: "Español - English" (español primero)
-- Máximo 5 palabras por idioma
+- Formato BILINGÜE: "Español - English" (español primero), asegurando la Inglés Técnico de Alta Fidelidad.
+- Máximo 5 palabras por idioma. Asegurar exclusión mutua para facilitar ramas AND/OR.
 - Aplicar enfoque personalizado: ${customFocus}
 
 RESPONDE SOLO CON EL JSON. NADA MÁS.

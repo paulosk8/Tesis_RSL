@@ -16,9 +16,9 @@ class GenerateTitlesUseCase {
    * @param {String} params.aiProvider - Proveedor de IA ('chatgpt', 'chatgpt' o 'gemini')
    * @returns {Object} Resultado con 5 títulos y validación
    */
-  async execute({ matrixData, picoData, aiProvider = 'chatgpt' }) {
+  async execute({ matrixData, picoData, aiProvider = 'gemini' }) {
     try {
-      console.log('Generando 5 títulos con validación Cochrane...');
+      console.log('Generando 5 títulos con validación Cochrane usando Gemini...');
       
       if (!this.gemini) {
         throw new Error('No hay proveedor de IA configurado');
@@ -35,7 +35,7 @@ class GenerateTitlesUseCase {
       try {
         response = await this._generateWithChatGPT(prompt);
       } catch (error) {
-        console.error(`Error con ChatGPT:`, error.message);
+        console.error(`Error con Gemini:`, error.message);
         throw error;
       }
       
@@ -45,13 +45,13 @@ class GenerateTitlesUseCase {
       // Parsear respuesta
       const titles = this._parseResponse(response);
       
-      console.log(`Generados ${titles.length} títulos exitosamente con chatgpt`);
+      console.log(`Generados ${titles.length} títulos exitosamente con Gemini`);
       
       return {
         success: true,
         data: {
           titles,
-          provider: 'chatgpt'
+          provider: 'gemini'
         }
       };
     } catch (error) {
@@ -61,7 +61,7 @@ class GenerateTitlesUseCase {
   }
 
   /**
-   * Genera títulos usando ChatGPT
+   * Genera títulos usando ChatGPT/Gemini
    */
   async _generateWithChatGPT(prompt) {
     if (!this.gemini) {
@@ -73,14 +73,39 @@ class GenerateTitlesUseCase {
       systemInstruction: "Eres un Editor en Jefe de un Journal de Ingeniería de alto impacto (Q1). Tu estándar de calidad es extremo. Generas títulos académicos con rigor metodológico PRISMA 2020. Respondes ÚNICAMENTE en formato JSON válido.",
       generationConfig: {
         temperature: 0.6,
-        maxOutputTokens: 3000,
+        maxOutputTokens: 8192,
         responseMimeType: "application/json"
       }
     });
 
     const result = await model.generateContent(prompt);
-    const content = result.response.text();
-    return JSON.parse(content);
+    let content = result.response.text();
+    
+    // Limpiar posibles bloques de código markdown
+    content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    try {
+      return JSON.parse(content);
+    } catch (error) {
+       console.error("Error parseando JSON devuelto por Gemini:", error.message);
+       console.error("Contenido recibido:", content.substring(0, 200) + '...');
+       // Intentar reparar un JSON cortado agregando cierres básicos
+       if (error.message.includes("Unterminated string") || error.message.includes("Unexpected end of JSON input")) {
+         try {
+           // Intento desesperado de cerrar el JSON de forma cruda si se cortó al final de un string/objeto
+           let repairedContent = content;
+           if (repairedContent.endsWith('"')) repairedContent += '}]}';
+           else if (repairedContent.endsWith('}')) repairedContent += ']}';
+           else repairedContent += '"]}]}';
+           
+           console.log("Intentando recuperar JSON cortado...");
+           return JSON.parse(repairedContent);
+         } catch(e) {
+           throw new Error("El modelo generó un JSON truncado que no se pudo recuperar: " + error.message);
+         }
+       }
+       throw error;
+    }
   }
 
   /**
@@ -116,7 +141,7 @@ class GenerateTitlesUseCase {
    * Construye el prompt para generar títulos usando los datos PICO ya definidos en el paso anterior
    */
   _buildPrompt(context) {
-    return `Eres un Senior Research Editor especializado en ingeniería y metodología PRISMA 2020. Tu objetivo es generar 5 títulos académicos de alto impacto para una Revisión Sistemática de Literatura.
+    return `Eres un Senior Research Editor especializado en metodología de investigación y PRISMA 2020. Tu objetivo es generar 5 títulos académicos Q1 de alto impacto para una Revisión Sistemática de Literatura.
 
 ═══════════════════════════════════════════════════════════════
 DATOS PICO DEL PROTOCOLO (Ya definidos en paso anterior - USAR TAL CUAL)
@@ -126,62 +151,44 @@ ${context}
 ⚠️ IMPORTANTE: Los datos PICO arriba ya fueron validados metodológicamente. NO los reinterpretes ni modifiques. Úsalos directamente como insumo para construir los títulos.
 
 ═══════════════════════════════════════════════════════════════
-REGLAS DE REDACCIÓN ACADÉMICA PARA TÍTULOS
+REGLAS DE REDACCIÓN ACADÉMICA PARA TÍTULOS (ESTRICTO)
 ═══════════════════════════════════════════════════════════════
 
-1. **PRISMA Ítem 1**: El título DEBE incluir la naturaleza del estudio: "A Systematic Review", "A Scoping Review" o "Evidence Synthesis".
+1. **Etiquetado del Estudio (PRISMA Ítem 1)**: 
+   - El título DEBE terminar OBLIGATORIAMENTE con ": A Systematic Literature Review" (o ": A Scoping Literature Review" si explícitamente aplica). 
+   - ⚠️ PROHIBIDO usar la versión corta ": A Systematic Review". En ámbitos no médicos, es necesario especificar que la fuente es la literatura científica.
 
-2. **Outcome (O) Sintetizado (Umbrella Term)**: 
-   - ⚠️ CRÍTICO: NO listes métricas individuales (e.g., "infestation rate", "yield", "cost").
-   - DEBES usar un término "paraguas" que englobe el impacto.
-   - Ejemplos de síntesis:
-     *   "Infestation rate + Crop yield" → "**Pest Control Effectiveness**" o "**Agricultural Productivity**"
-     *   "Latency + Throughput" → "**Performance**"
-     *   "Sensitivity + Specificity" → "**Diagnostic Accuracy**"
-     *   "Cost + Time" → "**Efficiency**"
-   - El título debe leerse fluido y académico, no como una lista de variables.
+2. **Precisión de Componentes (Intervención y Comparador)**: 
+   - ⚠️ REGLA DE PRECISIÓN TÉCNICA: NO utilices nombres genéricos para (I) o (C). 
+   - Si el PICO especifica una marca, versión o estado específico (ej. "Official MongoDB Native Driver"), el título debe reflejar esa precisión técnica exacta, sin abstraerla.
 
-3. **Comparador (C) - REGLA CRÍTICA**: 
-   - ⚠️ Si el PICO tiene Comparison (C) definida, esto es una FORTALEZA metodológica.
-   - **OBLIGATORIO:** Mínimo 4 de 5 títulos DEBEN incluir la comparación explícitamente.
-   - Formato comparativo: "[I] vs. [C] for [O] in [P]" o "[O] of [I] Compared to [C] in [P]"
-   - La comparación debe ser clara y específica, no vaga.
+3. **Jerarquía del Resultado (Outcome - O)**: 
+   - El título debe estar construido alrededor del Outcome principal.
+   - Utiliza sustantivos de acción académica ponderante, tales como:
+     * "Comparative Performance Analysis of..."
+     * "Impact Evaluation of..."
+     * "Assessment of..."
+     * "Efficacy of..." (Para entornos clínicos)
+   - ⚠️ ESTRUCTURA PROHIBIDA: Evita títulos que parezcan "preguntas" o que usen lenguaje informal. PROHIBIDO usar estructuras chabacanas como "[Tech A] vs [Tech B] for [Outcome]".
 
-4. **Estilo Declarativo/Descriptivo (Q1/Q2)**:
-   - Preferir títulos que DECLARAN lo que se compara/evalúa.
-   - Ejemplos Q1: "MongoDB vs. PostgreSQL for Query Performance in Node.js Backend Systems"
-   - NO usar: "A Study of...", "Exploring...", "Investigating..."
-   - SÍ usar: "[Tech A] vs. [Tech B] for [Outcome]", "[Outcome] of [Tech] Compared to [Baseline]"
+4. **Adaptación por Dominio Cualitativo**:
+   - Para títulos en **Ingeniería/Tecnología**, agrupa Outcomes bajo conceptos como: "Performance Overhead", "System Efficiency", "Architectural Impact", "Computational Cost".
+   - Para títulos en **Salud/Ciencias Sociales**, agrupa Outcomes bajo conceptos como: "Patient Outcomes", "Prevalence", "Intervention Effectiveness", "Clinical Efficacy".
 
-5. **Sin buzzwords**: Prohibido usar "Moderno", "Avanzado", "Reciente", "Impacto general", "Mejora", "Estudio sobre", "Exploring", "Investigating".
+5. **Estructuras Altamente Recomendadas (Patrones Q1)**:
+   - **Patrón C1**: "[Sustantivo de Acción Académica] of [Intervention] Compared to [Comparator] in [Population]: A Systematic Literature Review"
+   - **Patrón C2**: "[Outcome Paraguas] Impact of [Intervention] Versus [Comparator] in [Population]: A Systematic Literature Review"
+   - **Patrón A** (Si no hay Comparator): "[Sustantivo de Acción Académica] of [Intervention] on [Outcome] in [Population]: A Systematic Literature Review"
 
-6. **Longitud**: Entre 12 y 18 palabras.
-
-7. **Precisión técnica**: Usar la terminología exacta del PICO para P, I, C y términos paraguas para O.
-
-═══════════════════════════════════════════════════════════════
-PATRONES DE ESTRUCTURA (Prioridad a Comparativos si C existe)
-═══════════════════════════════════════════════════════════════
-
-**CUANDO HAY COMPARACIÓN (C) - USAR ESTOS 4 PATRONES PRIMERO:**
-**Patrón C1** (Declarativo directo): [I] vs. [C] for [O] in [P]: A Systematic Review
-**Patrón C2** (Outcome primero): [O] of [I] Compared to [C] in [P]: A Systematic Review
-**Patrón C3** (Comparativo nominal): Comparative Analysis of [I] and [C] for [O] in [P]: A Systematic Review
-**Patrón C4** (Evaluación): Evaluating [I] Against [C] for [O] in [P]: A Systematic Review
-
-**CUANDO NO HAY COMPARACIÓN - USAR ESTOS:**
-**Patrón A** (Sin Comparison): [I] for [O] in [P]: A Systematic Review
-**Patrón B** (Outcome primero): [O] of [I] in [P]: A Systematic Review
-**Patrón D** (Scoping): [O] of [I] in [P]: A Scoping Review
+6. **Prohibiciones Totales**:
+   - Cero buzzwords ("Moderno", "Avanzado", "Reciente", "Estudio sobre").
+   - La extensión completa debe ser fluida, de 12 a 23 palabras.
 
 ═══════════════════════════════════════════════════════════════
 JUSTIFICACIÓN (30-50 palabras en español)
 ═══════════════════════════════════════════════════════════════
 Debe explicar el "Research Gap": por qué esa combinación de P + I + O merece ser investigada.
 NO hablar de la gramática del título. Hablar del CONTENIDO y su relevancia científica.
-
-PROHIBIDO: "El título refleja...", "Se utiliza el Patrón A...", "Este título integra..."
-CORRECTO: Hablar del vacío de investigación y la relevancia del tema.
 
 ═══════════════════════════════════════════════════════════════
 FORMATO JSON DE RESPUESTA
@@ -190,19 +197,19 @@ FORMATO JSON DE RESPUESTA
 {
   "titles": [
     {
-      "title": "Título en INGLÉS académico",
+      "title": "Título en INGLÉS académico fiel a las reglas de estructura y etiqueta",
       "spanishTitle": "Traducción profesional al ESPAÑOL",
       "justification": "Justificación en español (30-50 palabras)",
       "spanishJustification": "Misma justificación",
       "cochraneCompliance": "full|partial",
       "wordCount": 15,
-      "pattern": "A|B|C|D",
+      "pattern": "C1|C2|A",
       "components": {
         "population": "[Del PICO-P]",
         "intervention": "[Del PICO-I]",
         "comparator": "[Del PICO-C o null]",
         "outcome": "[Del PICO-O]",
-        "naturaleza": "Systematic Review / Scoping Review"
+        "naturaleza": "Systematic Literature Review"
       },
       "validation": {
         "explicitReview": true,
@@ -221,12 +228,10 @@ INSTRUCCIONES FINALES
 ═══════════════════════════════════════════════════════════════
 
 1. Genera EXACTAMENTE 5 títulos DISTINTOS y NO REDUNDANTES
-2. Mínimo 4 de 5 deben tener "cochraneCompliance": "full"
-3. Cada título DEBE incluir el Outcome (O) del PICO de manera concreta
-4. ⚠️ **CRÍTICO - COMPARACIÓN:** Si PICO tiene C (Comparison), MÍNIMO 4 de 5 títulos DEBEN usar patrones C1, C2, C3 o C4 (incluir la comparación explícitamente)
-5. Cada título DEBE tener justificación de 30-50 palabras
-6. **Estilo Q1/Q2:** Títulos declarativos/descriptivos, NO usar "Exploring", "Investigating", "A Study of"
-7. Responde ÚNICAMENTE con JSON válido, sin texto adicional
+2. Todo título DEBE acabar en ": A Systematic Literature Review" obligatoriamente.
+3. Todo título DEBE usar un "Sustantivo de acción" para liderar el Outcome (Comparative Performance Analysis, Evaluación de Impacto, etc)
+4. Ningún título debe usar la estructura burda "A vs B". Siempre conectar con "Compared to", "Versus" o "Assessment of A against B".
+5. Responde ÚNICAMENTE con JSON válido, sin texto markdown adicional antes o después.
 
 GENERA LOS 5 TÍTULOS AHORA:`;
   }
@@ -361,8 +366,8 @@ GENERA LOS 5 TÍTULOS AHORA:`;
   _generateFallbackTitles() {
     return [
       {
-        title: 'A Systematic Literature Review: Research Topic in Study Context',
-        spanishTitle: 'Una Revisión Sistemática de Literatura: Tema de Investigación en Contexto de Estudio',
+        title: 'Comparative Performance Analysis of Research Topic in Study Context: A Systematic Literature Review',
+        spanishTitle: 'Análisis de Rendimiento Comparativo del Tema de Investigación en Contexto de Estudio: Una Revisión Sistemática de Literatura',
         cochraneCompliance: 'partial',
         justification: 'Título genérico de respaldo - requiere personalización con datos PICO',
         spanishJustification: 'Título genérico de respaldo - requiere personalización con datos PICO',
@@ -373,11 +378,11 @@ GENERA LOS 5 TÍTULOS AHORA:`;
           comparator: null,
           outcome: 'unspecified outcomes'
         },
-        wordCount: 9
+        wordCount: 14
       },
       {
-        title: 'Exploring Intervention Strategies for Target Outcomes: A Systematic Review',
-        spanishTitle: 'Explorando Estrategias de Intervención para Resultados Objetivo: Una Revisión Sistemática',
+        title: 'Impact Evaluation of Intervention Strategies on Target Outcomes: A Systematic Literature Review',
+        spanishTitle: 'Evaluación de Impacto de las Estrategias de Intervención en los Resultados Objetivo: Una Revisión Sistemática de Literatura',
         cochraneCompliance: 'partial',
         justification: 'Título de respaldo - estructura básica correcta pero necesita especificación',
         spanishJustification: 'Título de respaldo - estructura básica correcta pero necesita especificación',
@@ -388,11 +393,11 @@ GENERA LOS 5 TÍTULOS AHORA:`;
           comparator: null,
           outcome: 'target outcomes'
         },
-        wordCount: 10
+        wordCount: 13
       },
       {
-        title: 'Study Intervention and Its Impact on Primary Outcomes: A Literature Review',
-        spanishTitle: 'Intervención de Estudio y su Impacto en Resultados Primarios: Una Revisión de Literatura',
+        title: 'Assessment of Study Intervention Compared to Baseline in Primary Outcomes: A Systematic Literature Review',
+        spanishTitle: 'Evaluación de Intervención de Estudio frente a Línea Base en Resultados Primarios: Una Revisión Sistemática de Literatura',
         cochraneCompliance: 'partial',
         justification: 'Título de respaldo - faltan detalles específicos de población y contexto',
         spanishJustification: 'Título de respaldo - faltan detalles específicos de población y contexto',
@@ -400,14 +405,14 @@ GENERA LOS 5 TÍTULOS AHORA:`;
         components: {
           population: 'study participants',
           intervention: 'study intervention',
-          comparator: null,
+          comparator: 'baseline',
           outcome: 'primary outcomes'
         },
-        wordCount: 12
+        wordCount: 15
       },
       {
-        title: 'A Scoping Review of Research Topic in Target Population',
-        spanishTitle: 'Una Revisión Exploratoria del Tema de Investigación en Población Objetivo',
+        title: 'System Efficiency Outcomes of Research Topic in Target Population: A Scoping Literature Review',
+        spanishTitle: 'Resultados de Eficiencia Sistémica del Tema de Investigación en Población Objetivo: Una Revisión Exploratoria de Literatura',
         cochraneCompliance: 'partial',
         justification: 'Título de respaldo - requiere información específica de PICO',
         spanishJustification: 'Título de respaldo - requiere información específica de PICO',
@@ -418,11 +423,11 @@ GENERA LOS 5 TÍTULOS AHORA:`;
           comparator: null,
           outcome: 'research findings'
         },
-        wordCount: 10
+        wordCount: 14
       },
       {
-        title: 'Systematic Review: Implementation Strategies for Study Context and Expected Results',
-        spanishTitle: 'Revisión Sistemática: Estrategias de Implementación para Contexto de Estudio y Resultados Esperados',
+        title: 'Efficacy Assessment of Implementation Strategies for Expected Results: A Systematic Literature Review',
+        spanishTitle: 'Evaluación de Eficacia de Estrategias de Implementación para Resultados Esperados: Una Revisión Sistemática de Literatura',
         cochraneCompliance: 'partial',
         justification: 'Título de respaldo - estructura adecuada pero requiere datos específicos',
         spanishJustification: 'Título de respaldo - estructura adecuada pero requiere datos específicos',
@@ -433,7 +438,7 @@ GENERA LOS 5 TÍTULOS AHORA:`;
           comparator: null,
           outcome: 'expected results'
         },
-        wordCount: 11
+        wordCount: 13
       }
     ];
   }

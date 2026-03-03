@@ -232,24 +232,24 @@ Genera exactamente 7 elementos de análisis con respuestas fundamentadas:
    - justificacion: [Estándares de calidad, impacto en validez de resultados, min. 30-40 palabras]
 
 **CRITERIOS DE INCLUSIÓN (ES) - 7 elementos mínimos:**
-Genera 7 criterios POSITIVOS que definan el alcance de la revisión:
-1. "Estudios que analicen [fenómeno/tecnología específica] en contextos de ${area}"
-2. "Investigaciones que utilicen [método/tecnología I] de forma operacionalizada"
-3. "Estudios que midan resultados en términos de [outcomes específicos]"
-4. "Artículos en journals revisados por pares o conferencias indexadas (IEEE, ACM, Springer, Elsevier)"
-5. "Publicaciones entre ${yearStart} y ${yearEnd}"
-6. "Estudios empíricos con datos cuantitativos o cualitativos verificables"
-7. "Investigaciones en inglés o español con acceso a texto completo"
+Genera 7 criterios POSITIVOS bajo estrictos estándares PRISMA/Kitchenham:
+1. "Alineación PICO: Estudios que aborden SIMULTÁNEAMENTE la intervención [I] comparada con [C] (si existe) en el contexto de [P]. Si el título sugiere un escenario específico de estrés, el estudio debe abordarlo."
+2. "Calidad de Evidencia: Estudios empíricos, experimentales, cuasi-experimentales o de observación que proporcionen datos primarios empíricos rigurosos."
+3. "Medición de Outcomes: Investigaciones que reporten métricas cuantitativas o cualitativas directas sobre [O] (ej. ${area === 'Ingeniería' ? 'Rendimiento, Latencia, Eficiencia' : 'Impacto, Eficacia, Validez'})."
+4. "Rigor de Publicación: Documentos sometidos a revisión por pares (peer-reviewed) en revistas indexadas o actas de congresos científicos de alto prestigio (IEEE, ACM, Springer, Scopus, WoS)."
+5. "Vigencia Temporal: Publicaciones publicadas estrictamente entre ${yearStart} y ${yearEnd}."
+6. "Relevancia de Dominio: Estudios cuyo foco principal de aplicación tecnológica resuelva problemas del dominio de [P]."
+7. "Accesibilidad: Investigaciones en inglés o español con acceso a texto completo."
 
 **CRITERIOS DE EXCLUSIÓN (NO ES) - 7 elementos mínimos:**
-Genera 7 límites NEGATIVOS claros:
-1. "Estudios anteriores a ${yearStart} que no reflejan el estado actual de la tecnología"
-2. "Literatura gris (tesis, reportes técnicos no publicados) que no cumplen estándares académicos"
-3. "Investigaciones en áreas fuera de ${area} que no son relevantes para el fenómeno"
-4. "Artículos sin evidencia empírica (opiniones, editoriales) que no aportan datos verificables"
-5. "Estudios que no analicen específicamente [intervención I]"
-6. "Investigaciones que no midan resultados cuantificables en [outcomes O]"
-7. "Publicaciones en idiomas distintos a inglés/español sin traducción disponible"
+Genera 7 límites NEGATIVOS bajo reglas Anti-Ruido:
+1. "Desviación de Comparador: Estudios que comparen la intervención [I] con herramientas o métodos distintos al comparador especificado [C]."
+2. "Baja Jerarquía de Evidencia: Artículos de opinión, editoriales, cartas al editor, tutoriales, capítulos de libros no originales y revisiones de literatura no sistemáticas (narrativas)."
+3. "Duplicidad y Preliminares: Versiones preliminares, resúmenes de conferencias con versión extendida existente, o estudios con la misma muestra de un autor ya incluido."
+4. "Desambiguación Semántica: Estudios donde el término [I] o [C] se utilice en un contexto ajeno a ${area} (ej. excluir usos en otras ciencias o industrias no relacionadas)."
+5. "Literatura Gris: Blogs, foros, informes técnicos de empresas no arbitrados y tesis de pregrado no publicadas."
+6. "Desviación de Outcomes: Investigaciones que menciones las tecnologías pero no midan resultados cuantificables o empíricos sobre [O]."
+7. "Barrera de Idioma: Publicaciones en idiomas distintos a inglés/español sin traducción oficial disponible."
 
 **ESTRUCTURA DE MATRIZ DE SÍNTESIS:**
 Define las columnas que se usarán para extraer datos de cada estudio incluido:
@@ -478,90 +478,27 @@ Responde exactamente estas 7 preguntas basándote en el PICO actualizado:
    - justificacion: [Impacto en validez de resultados, mínimo 30-40 palabras]
 
 **CRITERIOS DE INCLUSIÓN (ES) - 7 elementos:**
-Generar criterios que reflejen EXACTAMENTE el PICO actualizado:
+Generar criterios que reflejen EXACTAMENTE el PICO actualizado bajo estándares PRISMA:
 
-1. "Estudios que analicen [fenómeno de Intervención I] en contextos de [Población P específica]"
-2. "Investigaciones que utilicen [método/tecnología de I] de forma operacionalizada"
-3. "Estudios que midan resultados en términos de [Outcomes O específicos]"
-4. "Artículos en journals revisados por pares o conferencias indexadas (IEEE, ACM, Springer, Elsevier)"
-5. "Publicaciones entre ${yearStart} y ${yearEnd}"
-6. "Estudios empíricos con datos cuantitativos o cualitativos verificables"
-7. "Investigaciones en inglés o español con acceso a texto completo"
+1. "Alineación PICO: Estudios que aborden SIMULTÁNEAMENTE [extraer de I] comparado con [extraer de C] en el contexto de [extraer de P]."
+2. "Calidad de Evidencia: Estudios empíricos, experimentales, cuasi-experimentales o de observación que proporcionen datos primarios empíricos rigurosos."
+3. "Medición de Outcomes: Investigaciones que reporten métricas cuantitativas o cualitativas directas sobre [outcomes específicos de O] (ej. ${area === 'Ingeniería' ? 'Rendimiento, Latencia, Eficiencia' : 'Impacto, Eficacia, Validez'})."
+4. "Rigor de Publicación: Documentos sometidos a revisión por pares (peer-reviewed) en revistas indexadas o actas de congresos científicos de alto prestigio."
+5. "Vigencia Temporal: Publicaciones estrictamente entre ${yearStart} y ${yearEnd}."
+6. "Relevancia de Dominio: Estudios cuyo foco principal resuelva problemas en el ecosistema técnico de [extraer de P]."
+7. "Accesibilidad: Investigaciones en inglés o español con acceso a texto completo."
 
 **CRITERIOS DE EXCLUSIÓN (NO ES) - 7 elementos:**
-Generar exclusiones coherentes con el PICO:
+Generar exclusiones coherentes y blindajes Anti-Ruido:
 
-1. "Estudios anteriores a ${yearStart} que no reflejan el estado actual de la tecnología"
-2. "Literatura gris (tesis, reportes técnicos no publicados) que no cumplen estándares académicos"
-3. "Investigaciones en áreas fuera de [contexto de Población P] que no son relevantes"
-4. "Artículos sin evidencia empírica (opiniones, editoriales) que no aportan datos verificables"
-5. "Estudios que no analicen específicamente [Intervención I actualizada]"
-6. "Investigaciones que no midan resultados cuantificables en [Outcomes O actualizados]"
-7. "Publicaciones en idiomas distintos a inglés/español sin traducción disponible"
+1. "Desviación de Comparador: Estudios que comparen la intervención [I actualizada] con herramientas o métodos distintos al comparador especificado."
+2. "Baja Jerarquía de Evidencia: Artículos de opinión, editoriales, cartas al editor, tutoriales, capítulos de libros no originales y revisiones narrativas."
+3. "Duplicidad y Preliminares: Versiones preliminares, resúmenes de conferencias con versión extendida o estudios con la misma muestra empírica."
+4. "Desambiguación Semántica: Estudios donde el término de [I actualizada] o contexto [P actualizada] se utilice en un área científica ajena a ${area}."
+5. "Literatura Gris: Blogs, foros, reportes técnicos no arbitrados y tesis de pregrado no publicadas."
+6. "Desviación de Outcomes: Investigaciones que no midan resultados cuantificables o empíricos sobre [O actualizada]."
+7. "Barrera de Idioma: Publicaciones en idiomas distintos a inglés/español sin traducción oficial disponible."
 
-═══════════════════════════════════════════════════════════════
-FORMATO JSON DE SALIDA (ESTRICTO)
-═══════════════════════════════════════════════════════════════
-
-{
-  "fase2_matriz_es_no_es": {
-    "analisis_critico": [
-      {
-        "pregunta": "¿Qué fenómeno/tecnología se investiga específicamente?",
-        "presente": "[basado en I actualizada, min. 20-30 palabras]",
-        "justificacion": "[relevancia para ${area}, min. 30-40 palabras]"
-      },
-      {
-        "pregunta": "¿En qué contexto técnico o dominio se aplica?",
-        "presente": "[basado en P actualizada - sistemas técnicos, min. 20-30 palabras]",
-        "justificacion": "[delimitación del contexto técnico, min. 30-40 palabras]"
-      },
-      {
-        "pregunta": "¿Qué intervención/método específico se analiza?",
-        "presente": "[detalles de I con operacionalización, min. 20-30 palabras]",
-        "justificacion": "[implementación y características distintivas, min. 30-40 palabras]"
-      },
-      {
-        "pregunta": "¿Existe comparación con alternativas?",
-        "presente": "[análisis de C actualizada, min. 20-30 palabras]",
-        "justificacion": "[relevancia o ausencia de comparación, min. 30-40 palabras]"
-      },
-      {
-        "pregunta": "¿Qué variables de resultado se miden?",
-        "presente": "[métricas específicas de O actualizada, min. 20-30 palabras]",
-        "justificacion": "[importancia de estas métricas para objetivos, min. 30-40 palabras]"
-      },
-      {
-        "pregunta": "¿Qué tipos de estudios se consideran válidos?",
-        "presente": "[diseños metodológicos para ${area}, min. 20-30 palabras]",
-        "justificacion": "[adecuación metodológica al área, min. 30-40 palabras]"
-      },
-      {
-        "pregunta": "¿Cuál es el rigor de la evidencia requerida?",
-        "presente": "[estándares de calidad académica, min. 20-30 palabras]",
-        "justificacion": "[impacto en validez de resultados, min. 30-40 palabras]"
-      }
-    ],
-    "criterios_inclusion_es": [
-      "Estudios que analicen [extraer de I] en contextos de [extraer de P]",
-      "Investigaciones que utilicen [método específico de I] de forma operacionalizada",
-      "Estudios que midan resultados en términos de [outcomes específicos de O]",
-      "Artículos en journals revisados por pares o conferencias indexadas (IEEE, ACM, Springer, Elsevier)",
-      "Publicaciones entre ${yearStart} y ${yearEnd}",
-      "Estudios empíricos con datos cuantitativos o cualitativos verificables",
-      "Investigaciones en inglés o español con acceso a texto completo"
-    ],
-    "criterios_exclusion_no_es": [
-      "Estudios anteriores a ${yearStart} que no reflejan el estado actual de la tecnología",
-      "Literatura gris (tesis, reportes técnicos no publicados) que no cumplen estándares académicos", 
-      "Investigaciones en áreas fuera de [contexto P] que no son relevantes para el fenómeno",
-      "Artículos sin evidencia empírica (opiniones, editoriales) que no aportan datos verificables",
-      "Estudios que no analicen específicamente [intervención I actualizada]",
-      "Investigaciones que no midan resultados cuantificables en [outcomes O actualizados]",
-      "Publicaciones en idiomas distintos a inglés/español sin traducción disponible"
-    ]
-  }
-}
 
 ═══════════════════════════════════════════════════════════════
 VALIDACIÓN CRÍTICA ANTES DE RESPONDER
@@ -593,7 +530,7 @@ RESPONDE ÚNICAMENTE CON EL JSON VÁLIDO. NO AGREGUES TEXTO ADICIONAL.
         systemInstruction: 'Eres un experto en metodología PRISMA 2020/Cochrane para revisiones sistemáticas en Ingeniería y Tecnología. REGLAS CRÍTICAS ABSOLUTAS: (1) La POBLACIÓN en RSL de ingeniería es el SISTEMA/ENTORNO TÉCNICO donde se aplica la tecnología, NUNCA "artículos", "estudios" o "publicaciones". (2) Si PICO-C existe, el TÍTULO DEBE incluirlo con formato "I vs C: Impact on O". (3) Usa TÉRMINOS PARAGUAS en títulos (Performance, Efficiency), no métricas individuales. Respondes solo con JSON válido.',
         generationConfig: {
           temperature: 0.6,
-          maxOutputTokens: 5000,
+          maxOutputTokens: 8192,
           responseMimeType: "application/json"
         }
       });

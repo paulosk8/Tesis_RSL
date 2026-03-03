@@ -206,19 +206,23 @@ ${picoData?.comparison && picoData.comparison.trim() && picoData.comparison !== 
 '(Bloque I: 2-3 términos) AND (Bloque P: 2-3 términos) AND (Bloque O: 2-3 términos)\nResultado: 2×2×2 = 8 a 3×3×3 = 12 términos'}
 
 ═══════════════════════════════════════════════════════════════
-SINTAXIS POR BASE DE DATOS
+SINTAXIS ESTRICTA POR BASE DE DATOS E INSTRUCCIONES FORMALES
 ═══════════════════════════════════════════════════════════════
+
+REGLAS GLOBALES DE FORMATEO (APLICAN A TODAS LAS BASES):
+1. **Gestión de Comillas:** TODO término compuesto (de 2 o más palabras, ej. "Native Driver", "Machine Learning", "Node.js") DEBE ir obligatoriamente entre comillas dobles ("") para garantizar búsqueda de frase exacta.
+2. **Wildcards Inteligentes:** Emplea el asterisco (*) al final de raíces clave (ej. benchmark*, efficien*, optimiz*) para expandir a variantes morfológicas en bases compatibles (Scopus, ACM, Web of Science, PubMed).
 
 ${databases.map(db => {
   const dbLower = db.toLowerCase();
-  if (dbLower === 'ieee' || dbLower === 'ieee xplore') return `**IEEE Xplore:** Query directa SIN etiquetas de campo. NO soporta wildcards (*). ⚠️ CRÍTICO: MÁXIMO 10 TÉRMINOS TOTALES (incluye AND/OR). Usar SOLO 2 términos por bloque: (2 términos) AND (2 términos) AND (2 términos) = 8 términos máximo. Paréntesis simples, verificar que no confundan al motor.${yearStart ? ' Filtro temporal en interfaz, NO en query.' : ''}`;
-  if (dbLower === 'scopus') return `**Scopus:** Formato TITLE-ABS-KEY((...bloques...)). Soporta wildcards (*). Máximo 3 términos OR por bloque. Paréntesis balanceados. ⚠️ RECORDATORIO: Filtrar manualmente por Subject Area (Computer Science/Engineering) en la interfaz para eliminar resultados de biología.${yearStart && yearEnd ? ` Agregar: AND PUBYEAR > ${yearStart - 1} AND PUBYEAR < ${yearEnd + 1}` : ''}`;
-  if (dbLower === 'pubmed') return `**PubMed:** Usar [Title/Abstract]. Soporta wildcards (*). Considerar MeSH Terms si aplica.${yearStart ? ' Filtro temporal en interfaz.' : ''}`;
-  if (dbLower === 'webofscience' || dbLower === 'web of science') return `**Web of Science:** Formato TS=((...bloques...)). Soporta wildcards (*). Máximo 3 términos OR por bloque. ⚠️ RECORDATORIO: Filtrar manualmente por Subject Area (Computer Science/Engineering) en la interfaz.${yearStart && yearEnd ? ` Agregar: AND PY=(${yearStart}-${yearEnd})` : ''}`;
-  if (dbLower === 'google_scholar' || dbLower === 'google scholar') return `**Google Scholar:** Query simple sin etiquetas. NO soporta wildcards ni operadores avanzados.${yearStart ? ' Filtro temporal en interfaz.' : ''}`;
-  if (dbLower === 'acm') return `**ACM Digital Library:** Query con paréntesis, sin wrapper especial. Soporta wildcards (*). Máximo 3 términos OR por bloque.${yearStart ? ' Filtro temporal en interfaz.' : ''}`;
-  if (dbLower === 'sciencedirect' || dbLower === 'science direct') return `**ScienceDirect:** Query simple con paréntesis. MÁXIMO 3-4 términos por grupo OR para no romper límites de la plataforma. NO exceder este límite.${yearStart ? ' Filtro temporal en interfaz.' : ''}`;
-  return `**${db}:** Query simple con paréntesis. Máximo 3 términos OR por bloque.${yearStart ? ' Filtro temporal en interfaz.' : ''}`;
+  if (dbLower === 'ieee' || dbLower === 'ieee xplore') return `**IEEE Xplore:** ⚠️ REGLA CRÍTICA SINTÁCTICA: Asegura el **doble paréntesis** envolviendo grupos complejos para evitar errores del motor de interpretación. Ejemplo: (("A" OR "B") AND ("C" OR "D")). NO usa wildcards (*). Máximo 10 términos totales.${yearStart ? ' Filtro temporal en la interfaz.' : ''}`;
+  if (dbLower === 'scopus') return `**Scopus:** ⚠️ REGLA CRÍTICA SINTÁCTICA: Debes envolver TODA la consulta con el operador restrictivo **TITLE-ABS-KEY(...)**. Sí soporta wildcards (*).${yearStart && yearEnd ? ` ⚠️ Filtro de año INYECTADO ESTRICTAMENTE (AND PUBYEAR > ${yearStart - 1} AND PUBYEAR < ${yearEnd + 1}).` : ''}`;
+  if (dbLower === 'pubmed') return `**PubMed:** Usar [Title/Abstract]. Soporta wildcards (*).${yearStart ? ' Filtro temporal en interfaz.' : ''}`;
+  if (dbLower === 'webofscience' || dbLower === 'web of science') return `**Web of Science:** Formato TS=((...bloques...)). Soporta wildcards (*).${yearStart && yearEnd ? ` AND PY=(${yearStart}-${yearEnd})` : ''}`;
+  if (dbLower === 'google_scholar' || dbLower === 'google scholar') return `**Google Scholar:** Búsqueda abierta, sin etiquetas complejas. NO comodines.${yearStart ? ' Filtro temporal en interfaz.' : ''}`;
+  if (dbLower === 'acm') return `**ACM Digital Library:** Query con paréntesis de prioridad simple. MUY recomendado usar wildcards (*) en la raíz de térmnos ingenieriles.${yearStart ? ' Filtro temporal en interfaz.' : ''}`;
+  if (dbLower === 'sciencedirect' || dbLower === 'science direct') return `**ScienceDirect:** ⚠️ LÍMITE INFRAESTRUCTURA: Mantén la cadena por debajo de los **8 conectores booleanos** en total (suma de ANDs + ORs) para prevenir cuelgues del sistema de Elsevier. Simplifica al máximo.${yearStart ? ' Filtro temporal en interfaz.' : ''}`;
+  return `**${db}:** Formato condicional estándar. Máximo 4 términos por bloque.${yearStart ? ' Filtro temporal en interfaz.' : ''}`;
 }).join('\n')}
 
 ═══════════════════════════════════════════════════════════════
