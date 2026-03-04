@@ -60,6 +60,21 @@ class GenerateArticleFromPrismaUseCase {
   }
 
   /**
+   * Helper: Convert number to Roman Numeral (for IEEE Tables)
+   */
+  toRoman(num) {
+    const lookup = { M: 1000, CM: 900, D: 500, CD: 400, C: 100, XC: 90, L: 50, XL: 40, X: 10, IX: 9, V: 5, IV: 4, I: 1 };
+    let roman = '';
+    for (let i in lookup) {
+      while (num >= lookup[i]) {
+        roman += i;
+        num -= lookup[i];
+      }
+    }
+    return roman;
+  }
+
+  /**
    * Translate text to Academic English using AI (only if it contains Spanish)
    */
   async translateToEnglish(text) {
@@ -737,7 +752,7 @@ Generate ONLY the introduction text in English:`;
     // Cadena de búsqueda general del protocolo (fallback)
     const globalSearchString = prismaContext.protocol.searchString || '';
 
-    // Generar tabla de búsquedas - SOLO markdown puro, sin títulos adicionales
+    // Generar tabla de búsquedas - IEEE Standard: TABLE I above
     let searchChart = '';
     
     if (searchQueries.length > 0) {
@@ -749,7 +764,7 @@ Generate ONLY the introduction text in English:`;
           return `| ${dbName} | ${searchStr} |`;
         }).join('\n');
 
-      searchChart = tableRows ? `**Search Strategy and Criteria per Database**\n\n| Database | Search String |\n|---------------|-------------------|\n${tableRows}` : '';
+      searchChart = tableRows ? `**TABLE ${this.toRoman(1)}**  \n**SEARCH STRATEGY AND CRITERIA PER DATABASE**\n\n| Database | Search String |\n|---------------|-------------------|\n${tableRows}` : '';
     }
     
     // Fallback: usar databases + cadena global del protocolo
@@ -760,7 +775,7 @@ Generate ONLY the introduction text in English:`;
         return `| ${dbName} | ${searchStr} |`;
       }).join('\n');
 
-      searchChart = `| Database | Search String |\n|---------------|-------------------|\n${tableRows}`;
+      searchChart = `**TABLE ${this.toRoman(1)}**  \n**SEARCH STRATEGY AND CRITERIA PER DATABASE**\n\n| Database | Search String |\n|---------------|-------------------|\n${tableRows}`;
     }
 
     // Translate PICO and PRISMA items from Spanish to English
@@ -937,7 +952,7 @@ ${synthesis}`);
     let synthesisSection = '';
     if (enhancedChartData && enhancedChartData.hasSynthesisData) {
       const summaryTable = this.generateTechnicalSynthesisMarkdownTable(enhancedChartData.technical_synthesis.studies);
-      synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\n**Table IV: Technical Performance Synthesis Matrix**\n\n${summaryTable}\n*Note: N/R indicates Not Reported.*\n`;
+      synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\n**TABLE ${this.toRoman(5)}**  \n**TECHNICAL PERFORMANCE SYNTHESIS MATRIX**\n\n${summaryTable}\n\n*Note: N/R indicates Not Reported.*\n`;
     } else if (enhancedChartData && !enhancedChartData.hasSynthesisData) {
       synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\nDirect quantitative comparison of technical performance could not be performed due to the lack of standardized metrics across the included studies.\n`;
     }
@@ -961,7 +976,7 @@ ${charts.prisma ? `![PRISMA 2020 Flow Diagram](${charts.prisma})\n*Figure 1. PRI
 
 ${rqsAnalysis || 'The included studies were analyzed using the RQS schema.'} 
 
-**Table I: General Characteristics of Included Primary Studies (n=${rqsStats.total})**
+**TABLE ${this.toRoman(2)}**  \n**GENERAL CHARACTERISTICS OF INCLUDED PRIMARY STUDIES (N=${rqsStats.total})**
 
 ${this.generateTable1Professional(rqsEntries)}
 
@@ -971,7 +986,7 @@ ${charts.temporal_distribution ? `\n![Temporal Distribution](${charts.temporal_d
 
 ${riskOfBiasResults}
 
-**Table II: Methodological Quality and Risk of Bias Assessment**
+**TABLE ${this.toRoman(3)}**  \n**METHODOLOGICAL QUALITY AND RISK OF BIAS ASSESSMENT**
 
 ${this.generateTable3Professional(rqsEntries)}
 
@@ -981,7 +996,7 @@ ${charts.quality_assessment ? `\n![Quality Assessment](${charts.quality_assessme
 
 ${rqSyntheticFindings}
 
-**Table III: Synthesis of Main Results and Reported Technical Metrics**
+**TABLE ${this.toRoman(4)}**  \n**SYNTHESIS OF MAIN RESULTS AND REPORTED TECHNICAL METRICS**
 
 ${this.generateTable2Professional(rqsEntries, prismaContext.protocol || {})}
 
@@ -1036,7 +1051,7 @@ ${keywordSection}`;
       }).join(' | ');
     }).join('\n');
     
-    return `| ${headerRow} |\n| ${separatorRow} |\n| ${dataRows} |`;
+    return `| ${headerRow} |\n| ${separatorRow} |\n| ${dataRows} |\n\n`;
   }
 
   /**
@@ -1101,11 +1116,7 @@ Respond ONLY with the analysis paragraphs in English:`;
 
     return `### 3.2.1 Descriptive analysis based on RQS data
 
-${response}
-
-${this.generateTable1Professional(rqsEntries)}
-
-${this.generateTable2Professional(rqsEntries)}`;
+${response}`;
   }
 
   /**
@@ -1186,8 +1197,6 @@ Respond with paragraphs only (no section headers):`;
    */
   generateTable1Professional(rqsEntries) {
     return `
-**Table I. General characteristics of studies included in the systematic review**
-
 | ID | Author (Year) | Study Type | Context | Main Technology | Publication |
 |----|-------------|-----------------|----------|---------------------|-------------|
 ${rqsEntries.map((entry, i) => {
@@ -1208,8 +1217,6 @@ ${rqsEntries.map((entry, i) => {
     const rqSubHeaders = researchQuestions.map(() => '---').join('|');
 
     return `
-**Table II. Synthesis of main results and reported technical metrics**
-
 | ID | Key Evidence | Main Metrics | ${rqHeaders} | Quality |
 |----|----------------|---------------------|${rqSubHeaders}|---------|
 ${rqsEntries.map((entry, i) => {
@@ -1243,15 +1250,13 @@ ${rqsEntries.map((entry, i) => {
       return `| ${id} | ${evidence} | ${metrics} | ${rqRelationSymbols} | ${quality} |`;
     }).join('\n')}
 
-*Legend: ✓ = Direct relation, ○ = Partial relation, ✗ = No direct relation*
+\n*Legend: ✓ = Direct relation, ○ = Partial relation, ✗ = No direct relation*
 *Quality: Qualitative assessment based on methodological transparency and reporting of limitations*
 `;
   }
 
   generateTable3Professional(rqsEntries) {
     return `
-**Table III. Methodological quality and risk of bias assessment**
-
 | ID | Adequate Design | Sufficient Data | Limitations Reported | Transparency | Overall Risk |
 |----|----------------|-------------------|------------------------|---------------|---------------|
 ${rqsEntries.map((entry, i) => {
@@ -1297,7 +1302,7 @@ ${rqsEntries.map((entry, i) => {
       return `| ${id} | ${design} | ${dataQuality} | ${limitationsReported} | ${transparency} | ${globalRisk} |`;
     }).join('\n')}
 
-*Note: The assessment was conducted considering the adequacy of the research design, sufficiency of data to answer the RQs, explicit acknowledgment of limitations, and transparency in methodological reporting.*
+\n*Note: The assessment was conducted considering the adequacy of the research design, sufficiency of data to answer the RQs, explicit acknowledgment of limitations, and transparency in methodological reporting.*
 `;
   }
 
