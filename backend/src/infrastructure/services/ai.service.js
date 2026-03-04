@@ -71,8 +71,8 @@ class AIService {
       throw new Error('Gemini API key no configurada');
     }
 
-    // Modelos a intentar en orden de preferencia (basado en la disponibilidad de la API Key)
-    const modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash'];
+    // Modelos a intentar en orden de preferencia
+    const modelsToTry = ['gemini-1.5-pro', 'gemini-1.5-flash'];
     let lastError = null;
     let tokensUsed = 0;
 
