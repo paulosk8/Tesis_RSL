@@ -6,11 +6,11 @@ class ApiClient {
 
   constructor() {
     this.baseUrl = API_URL
-    
+
     // Cargar token del localStorage o cookies si existe
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('token')
-      
+
       // Si no está en localStorage, intentar obtenerlo de las cookies
       if (!this.token) {
         const cookies = document.cookie.split(';')
@@ -27,7 +27,7 @@ class ApiClient {
     this.token = token
     if (typeof window !== 'undefined') {
       localStorage.setItem('token', token)
-      
+
       // También guardar en cookies para el middleware
       document.cookie = `authToken=${token}; path=/; max-age=${7 * 24 * 60 * 60}; SameSite=Lax`
     }
@@ -38,13 +38,13 @@ class ApiClient {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token')
       localStorage.removeItem('user')
-      
+
       // Limpiar cookie de forma agresiva (múltiples paths y dominios)
       document.cookie = 'authToken=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT'
       document.cookie = 'authToken=; path=/; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax'
       // También limpiar para el dominio actual sin path específico
       document.cookie = 'authToken=; max-age=0; expires=Thu, 01 Jan 1970 00:00:00 GMT'
-      
+
       // Limpiar sessionStorage también
       try { sessionStorage.clear() } catch { /* ignore */ }
     }
@@ -55,8 +55,8 @@ class ApiClient {
   }
 
   async request(endpoint: string, options: RequestInit = {}) {
-    const headers: HeadersInit = {
-      ...options.headers,
+    const headers: Record<string, string> = {
+      ...options.headers as Record<string, string>,
     }
 
     // Solo agregar Content-Type si no es FormData
@@ -68,18 +68,23 @@ class ApiClient {
       headers['Authorization'] = `Bearer ${this.token}`
     }
 
-    const response = await fetch(`${this.baseUrl}${endpoint}`, {
-      ...options,
-      headers,
-    })
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        ...options,
+        headers,
+      })
 
-    const data = await response.json()
+      const data = await response.json()
 
-    if (!response.ok) {
-      throw new Error(data.message || 'Error en la petición')
+      if (!response.ok) {
+        throw new Error(data.message || 'Error en la petición')
+      }
+
+      return data
+    } catch (err: any) {
+      console.error(`🚨 FATAL FETCH ERROR on ${endpoint}:`, err.message, err);
+      throw err;
     }
-
-    return data
   }
 
   // Auth
@@ -88,11 +93,11 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ email, fullName, password }),
     })
-    
+
     if (data.data.token) {
       this.setToken(data.data.token)
     }
-    
+
     return data.data
   }
 
@@ -101,29 +106,29 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ email, password }),
     })
-    
+
     if (data.data.token) {
       this.setToken(data.data.token)
     }
-    
+
     // Mapear 'name' a 'fullName' si es necesario
     if (data.data.user) {
       data.data.user.fullName = data.data.user.fullName || data.data.user.name || data.data.user.email?.split('@')[0] || 'Usuario'
     }
-    
+
     return data.data
   }
 
   async getMe() {
     const data = await this.request('/api/auth/me')
     const user = data.data.user
-    
+
     // Mapear 'name' a 'fullName' si es necesario
     const mappedUser = {
       ...user,
       fullName: user.fullName || user.name || user.email?.split('@')[0] || 'Usuario'
     }
-    
+
     return mappedUser
   }
 
@@ -168,8 +173,8 @@ class ApiClient {
 
   // AI Methods
   async generateProtocolAnalysis(
-    title: string, 
-    description: string, 
+    title: string,
+    description: string,
     aiProvider: 'chatgpt' | 'gemini' = 'chatgpt',
     area?: string,
     yearStart?: number,
@@ -217,8 +222,8 @@ class ApiClient {
 
   async generateSearchStrategies(
     protocolTerms: any,
-    picoData: any, 
-    databases: string[], 
+    picoData: any,
+    databases: string[],
     researchArea?: string,
     aiProvider: 'chatgpt' | 'gemini' = 'gemini'
   ) {
@@ -240,12 +245,12 @@ class ApiClient {
   ) {
     const data = await this.request('/api/ai/generate-protocol-terms', {
       method: 'POST',
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         selectedTitle: projectTitle,  // ← REGLA: Frontend envía título seleccionado en este parámetro
         projectTitle,  // Mantener compatibilidad con código existente
-        projectDescription, 
-        picoData, 
-        matrixData, 
+        projectDescription,
+        picoData,
+        matrixData,
         aiProvider,
         specificSection,
         customFocus
@@ -274,9 +279,9 @@ class ApiClient {
   ) {
     const data = await this.request('/api/ai/generate-inclusion-exclusion-criteria', {
       method: 'POST',
-      body: JSON.stringify({ 
-        protocolTerms, 
-        picoData, 
+      body: JSON.stringify({
+        protocolTerms,
+        picoData,
         aiProvider,
         specificType,
         customFocus,
@@ -309,9 +314,9 @@ class ApiClient {
   ) {
     const data = await this.request('/api/ai/generate-search-strategies', {
       method: 'POST',
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         databases: selectedDatabases,
-        picoData, 
+        picoData,
         matrixData,
         researchArea,
         protocolTerms,
@@ -379,6 +384,21 @@ class ApiClient {
     return data.data.protocol
   }
 
+  async generateResearchQuestions(projectId: string, picoData?: any) {
+    try {
+      console.log(`[API CLIENT] Enviando request a ${this.baseUrl}/api/projects/${projectId}/protocol/generate-rqs`);
+      const data = await this.request(`/api/projects/${projectId}/protocol/generate-rqs`, {
+        method: 'POST',
+        body: picoData ? JSON.stringify({ picoData }) : undefined,
+      })
+      console.log(`[API CLIENT] Respuesta Exitosa RQs:`, data);
+      return data.data
+    } catch (error: any) {
+      console.error(`[API CLIENT] Falló el Fetch de RQs:`, error);
+      throw error;
+    }
+  }
+
   // PRISMA Items
   async getPrismaItems(projectId: string) {
     const data = await this.request(`/api/projects/${projectId}/prisma`)
@@ -425,7 +445,7 @@ class ApiClient {
     if (filters.year) params.append('year', filters.year)
     if (filters.source) params.append('source', filters.source)
     if (filters.limit !== undefined) params.append('limit', filters.limit.toString())
-    
+
     const query = params.toString()
     const data = await this.request(`/api/references/${projectId}${query ? '?' + query : ''}`)
     return data.data
@@ -499,13 +519,6 @@ class ApiClient {
     })
   }
 
-  async detectDuplicates(projectId: string) {
-    const data = await this.request(`/api/references/${projectId}/detect-duplicates`, {
-      method: 'POST'
-    })
-    return data
-  }
-
   async resolveDuplicateGroup(projectId: string, groupId: string, keepReferenceId: string) {
     const data = await this.request(`/api/references/${projectId}/resolve-duplicate`, {
       method: 'POST',
@@ -565,7 +578,7 @@ class ApiClient {
     // Timeout extendido para procesos largos (10 minutos)
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 600000) // 10 minutos
-    
+
     try {
       const response = await fetch(`${this.baseUrl}/api/ai/run-project-screening-embeddings`, {
         method: 'POST',
@@ -580,15 +593,15 @@ class ApiClient {
         }),
         signal: controller.signal
       })
-      
+
       clearTimeout(timeoutId)
-      
+
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.message || 'Error en el screening')
       }
-      
+
       return data
     } catch (error: any) {
       clearTimeout(timeoutId)
@@ -743,7 +756,7 @@ class ApiClient {
   }
 
   // === PRISMA ENDPOINTS ===
-  
+
   /**
    * Extrae datos estructurados de PDFs completos
    */
@@ -786,7 +799,7 @@ class ApiClient {
   }
 
   // === ARTICLE ENDPOINTS ===
-  
+
   /**
    * Obtiene el estado del artículo (si puede ser generado)
    */
@@ -912,7 +925,7 @@ class ApiClient {
   }
 
   // === RQS (Research Question Schema) ENDPOINTS ===
-  
+
   /**
    * Obtiene todas las entradas RQS de un proyecto
    */

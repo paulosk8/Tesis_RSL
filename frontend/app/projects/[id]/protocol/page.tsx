@@ -10,11 +10,11 @@ import { WizardHeader } from "@/components/project-wizard/wizard-header"
 import { WizardNavigation } from "@/components/project-wizard/wizard-navigation"
 import { ProposalStep } from "@/components/project-wizard/steps/1-proposal-step"
 import { PicoMatrixStep } from "@/components/project-wizard/steps/2-pico-matrix-step"
-import { TitlesStep } from "@/components/project-wizard/steps/3-titles-step"
-import { ProtocolDefinitionStep } from "@/components/project-wizard/steps/5-protocol-definition-step"
-import { CriteriaStep } from "@/components/project-wizard/steps/4-criteria-step"
-import { SearchPlanStep } from "@/components/project-wizard/steps/6-search-plan-step"
-import { PrismaCheckStep } from "@/components/project-wizard/steps/7-prisma-check-step"
+import { TitlesStep } from "@/components/project-wizard/steps/4-titles-step"
+import { CriteriaStep } from "@/components/project-wizard/steps/5-criteria-step"
+import { ProtocolDefinitionStep } from "@/components/project-wizard/steps/6-protocol-definition-step"
+import { SearchPlanStep } from "@/components/project-wizard/steps/7-search-plan-step"
+import { PrismaCheckStep } from "@/components/project-wizard/steps/8-prisma-check-step"
 
 function ProtocolWizardContent() {
   const { currentStep } = useWizard()
@@ -66,7 +66,7 @@ export default function ProtocolPage({ params }: { readonly params: { id: string
         setLoading(false)
       }
     }
-    
+
     loadProject()
   }, [params.id])
 

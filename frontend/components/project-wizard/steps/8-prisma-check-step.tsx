@@ -4,7 +4,7 @@ import { useWizard } from "../wizard-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { 
+import {
   FileText,
   Save,
   Rocket,
@@ -23,7 +23,7 @@ const PRISMA_WPOM_ITEMS = [
   { id: "prisma-2", number: 2, question: "¿Se definen claramente las \"variables\"?", autoFillKey: "variables" },
   { id: "prisma-3", number: 3, question: "¿Se describe la justificación de la revisión en relación con lo que se conoce?", autoFillKey: "rationale" },
   { id: "prisma-4", number: 4, question: "¿Se proporciona una declaración explícita de las preguntas usando PICOS?", autoFillKey: "pico" },
-  { id: "prisma-5", number: 5, question: "Si extiende investigaciones previas, �explica por qué se necesita este estudio?", autoFillKey: "need" },
+  { id: "prisma-5", number: 5, question: "Si extiende investigaciones previas, ¿explica por qué se necesita este estudio?", autoFillKey: "need" },
   { id: "prisma-6", number: 6, question: "¿Se especifica y justifica la estrategia de búsqueda (manual, automatizada o mixta)?", autoFillKey: "searchStrategy" },
   { id: "prisma-7", number: 7, question: "¿Se identifican los criterios de inclusión y exclusión de estudios primarios?", autoFillKey: "criteria" },
   { id: "prisma-8", number: 8, question: "¿Se describen todas las fuentes de información utilizadas y fechas de cobertura?", autoFillKey: "sources" },
@@ -31,7 +31,7 @@ const PRISMA_WPOM_ITEMS = [
   { id: "prisma-10", number: 10, question: "¿Se identifican las revistas y conferencias para búsquedas manuales?", autoFillKey: "manualSearch" },
   { id: "prisma-11", number: 11, question: "¿Se especifica el período temporal de cobertura y su justificación?", autoFillKey: "temporalRange" },
   { id: "prisma-12", number: 12, question: "¿Se indican procedimientos auxiliares (e.g., consultas a expertos, revisión de bibliografía secundaria)?", autoFillKey: "auxiliary" },
-  { id: "prisma-13", number: 13, question: "¿Se describe cómo se evaluará el proceso de búsqueda (comparaci�n con revisión previa, etc.)?", autoFillKey: "validation" }
+  { id: "prisma-13", number: 13, question: "¿Se describe cómo se evaluará el proceso de búsqueda (comparación con revisión previa, etc.)?", autoFillKey: "validation" }
 ]
 
 export function PrismaCheckStep() {
@@ -72,7 +72,7 @@ export function PrismaCheckStep() {
     newPrismaData["prisma-13"] = { complies: true, evidence: "" }
 
     setPrismaData(newPrismaData)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const calculateCompliance = () => {
@@ -119,16 +119,16 @@ export function PrismaCheckStep() {
 
       // Solo incluir bases de datos que tienen referencias cargadas
       const databaseNames = (data.searchPlan?.databases || [])
-        .filter(dbId => {
-          const id = typeof dbId === 'object' && dbId !== null && 'id' in dbId ? dbId.id : dbId
-          return databasesWithRefs.has(id)
+        .filter((db: any) => {
+          const id = typeof db === 'object' && db !== null && 'id' in db ? db.id : db
+          return databasesWithRefs.has(id as string)
         })
-        .map(dbId => {
-          if (typeof dbId === 'object' && dbId !== null && 'name' in dbId) {
-            return dbId.name
+        .map((db: any) => {
+          if (typeof db === 'object' && db !== null && 'name' in db) {
+            return db.name
           }
-          if (typeof dbId === 'string') {
-            return DATABASE_ID_TO_NAME[dbId] || dbId
+          if (typeof db === 'string') {
+            return DATABASE_ID_TO_NAME[db] || db
           }
           return null
         }).filter(name => name !== null)
@@ -155,15 +155,15 @@ export function PrismaCheckStep() {
         }
       })
 
-      // Datos de actualizaci�n del proyecto (cambiar a estado 'in-progress')
+      // Datos de actualización del proyecto (cambiar a estado 'in-progress')
       const projectUpdateData = {
-        title: data.selectedTitle, // Limpiar título (quitar [TEMPORAL] si exist�a)
+        title: data.selectedTitle, // Limpiar título (quitar [TEMPORAL] si existía)
         description: data.projectDescription,
         status: 'in-progress', // Cambiar de 'draft' a 'in-progress'
         researchArea: data.researchArea
       }
 
-      // Datos del protocolo completo para actualizaci�n
+      // Datos del protocolo completo para actualización
       // Solo incluir campos PICO si tienen valor para no sobrescribir datos existentes
       const protocolData: any = {
         proposedTitle: titleToSave,
@@ -175,7 +175,7 @@ export function PrismaCheckStep() {
         databases: databaseNames,
         searchString: searchString,
         searchQueries: queries,
-        researchArea: data.researchArea, // Guardar área de investigaci�n
+        researchArea: data.researchArea, // Guardar área de investigación
         temporalRange: {
           start: data.yearStart || 2019,
           end: data.yearEnd || new Date().getFullYear(),
@@ -194,7 +194,7 @@ export function PrismaCheckStep() {
           evidence: prismaData[item.id]?.evidence || ''
         }))
       }
-      
+
       // Solo incluir campos PICO si tienen valor
       if (data.pico?.population) protocolData.population = data.pico.population
       if (data.pico?.intervention) protocolData.intervention = data.pico.intervention
@@ -202,9 +202,9 @@ export function PrismaCheckStep() {
       if (data.pico?.outcome) protocolData.outcomes = data.pico.outcome
       // Primero actualizar el protocolo
       await apiClient.updateProtocol(data.projectId, protocolData)
-      // Luego actualizar el proyecto (solo campos b�sicos)
-      // El m�todo request() lanza error si la respuesta no es exitosa, 
-      // por lo que si llegamos aqué sin error, el proyecto se actualiz� correctamente
+      // Luego actualizar el proyecto (solo campos básicos)
+      // El método request() lanza error si la respuesta no es exitosa, 
+      // por lo que si llegamos aquí sin error, el proyecto se actualizó correctamente
       await apiClient.updateProject(data.projectId, projectUpdateData as any)
       // Limpiar localStorage del wizard para evitar conflictos
       try {
@@ -212,14 +212,14 @@ export function PrismaCheckStep() {
       } catch (e) {
         // Non-critical: localStorage may be unavailable (e.g., private browsing)
       }
-      
+
       toast({
         title: "Proyecto completado exitosamente",
         description: "Tu revisión sistemática est� lista para la fase de ejecución"
       })
-      
+
       updateData({ lastSaved: new Date() })
-      
+
       // Usar replace en lugar de push para evitar problemas de navegaci�n
       setTimeout(() => {
         router.replace(`/projects/${data.projectId}`)
@@ -237,7 +237,7 @@ export function PrismaCheckStep() {
   }
 
   const compliance = calculateCompliance()
-  const researchArea = data.researchArea || "su área de investigaci�n"
+  const researchArea = data.researchArea || "su área de investigación"
   const themaCentral = data.projectName || "tema central"
 
   return (
@@ -246,7 +246,7 @@ export function PrismaCheckStep() {
       <div className="text-center space-y-3 mb-8">
         <h2 className="text-2xl font-bold">Confirmación del Protocolo</h2>
         <p className="text-base text-muted-foreground">
-          Resumen y confirmaci�n final de tu revisión sistemática en {researchArea}
+          Resumen y confirmación final de tu revisión sistemática en {researchArea}
         </p>
       </div>
 
@@ -269,14 +269,14 @@ export function PrismaCheckStep() {
           {/* Mensaje informativo */}
           <div className="border-l-4 border-primary pl-4 bg-primary/5 p-3 rounded-r">
             <p className="text-sm text-foreground">
-              Este es el paso final de tu protocolo de investigaci�n. A continuaci�n se presenta el <strong>resumen completo</strong> de toda la información generada durante la planificaci�n.
+              Este es el paso final de tu protocolo de investigación. A continuación se presenta el <strong>resumen completo</strong> de toda la información generada durante la planificación.
             </p>
           </div>
 
           {/* Título del Proyecto */}
           <div className="p-4 rounded-lg border-2 border-primary/20">
             <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Título de la Investigaci�n
+              Título de la Investigación
             </div>
             <p className="text-base font-semibold mt-1 text-gray-900 dark:text-gray-100">{data.selectedTitle}</p>
           </div>
@@ -296,8 +296,7 @@ export function PrismaCheckStep() {
               </div>
             </div>
             <div className="p-4 rounded-lg border-2 border-primary/20">
-              <div className="text-xs font-semibold text-muted-foreground uppercase">Términos Clave</div>
-              <div className="text-2xl font-bold text-foreground mt-2">
+              <div className="text-xs font-bold text-foreground mt-2">
                 {(data.protocolTerms?.tecnologia?.length || 0) + (data.protocolTerms?.dominio?.length || 0) + (data.protocolTerms?.focosTematicos?.length || 0)}
               </div>
             </div>
@@ -314,11 +313,11 @@ export function PrismaCheckStep() {
               <p className="font-medium mt-1 text-foreground">{data.projectName}</p>
             </div>
             <div className="p-3 rounded-lg border border-border">
-              <span className="text-xs font-semibold text-muted-foreground uppercase">área de Investigaci�n</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase">Área de Investigación</span>
               <p className="font-medium mt-1 text-gray-900 dark:text-gray-100">{researchArea.replace('-', ' ').toUpperCase()}</p>
             </div>
             <div className="p-3 rounded-lg border border-border">
-              <span className="text-xs font-semibold text-muted-foreground uppercase">Per�odo Temporal</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase">Período Temporal</span>
               <p className="font-medium mt-1 text-foreground">{data.yearStart || 'N/A'} - {data.yearEnd || 'N/A'}</p>
             </div>
           </div>
@@ -364,7 +363,7 @@ export function PrismaCheckStep() {
                     <ul className="mt-1 space-y-1">
                       {data.protocolTerms?.tecnologia?.map((t: string) => (
                         <li key={t} className="text-sm text-foreground flex items-start gap-1">
-                          <span className="text-primary mt-0.5">�</span> {t}
+                          <span className="text-primary mt-0.5">•</span> {t}
                         </li>
                       ))}
                     </ul>
@@ -376,7 +375,7 @@ export function PrismaCheckStep() {
                     <ul className="mt-1 space-y-1">
                       {data.protocolTerms?.dominio?.map((d: string) => (
                         <li key={d} className="text-sm text-foreground flex items-start gap-1">
-                          <span className="text-primary mt-0.5">�</span> {d}
+                          <span className="text-primary mt-0.5">•</span> {d}
                         </li>
                       ))}
                     </ul>
@@ -388,7 +387,7 @@ export function PrismaCheckStep() {
                     <ul className="mt-1 space-y-1">
                       {data.protocolTerms?.tipoEstudio?.map((t: string) => (
                         <li key={t} className="text-sm text-foreground flex items-start gap-1">
-                          <span className="text-primary mt-0.5">�</span> {t}
+                          <span className="text-primary mt-0.5">•</span> {t}
                         </li>
                       ))}
                     </ul>
@@ -400,7 +399,7 @@ export function PrismaCheckStep() {
                     <ul className="mt-1 space-y-1">
                       {data.protocolTerms?.focosTematicos?.map((f: string) => (
                         <li key={f} className="text-sm text-foreground flex items-start gap-1">
-                          <span className="text-primary mt-0.5">�</span> {f}
+                          <span className="text-primary mt-0.5">•</span> {f}
                         </li>
                       ))}
                     </ul>
@@ -410,17 +409,17 @@ export function PrismaCheckStep() {
             </div>
           )}
 
-          {/* --- SECCIÓN: Criterios de Inclusi�n y Exclusi�n --- */}
+          {/* --- SECCIÓN: Criterios de Inclusión y Exclusión --- */}
           {(data.inclusionCriteria?.length > 0 || data.exclusionCriteria?.length > 0) && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 border-b pb-2">
                 <Filter className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold text-base">Criterios de Inclusi�n / Exclusi�n</h3>
+                <h3 className="font-semibold text-base">Criterios de Inclusión / Exclusión</h3>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {data.inclusionCriteria?.length > 0 && (
                   <div className="p-3 rounded-lg border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20">
-                    <span className="text-xs font-bold text-green-700 dark:text-green-400 uppercase">Criterios de Inclusi�n ({data.inclusionCriteria.length})</span>
+                    <span className="text-xs font-bold text-green-700 dark:text-green-400 uppercase">Criterios de Inclusión ({data.inclusionCriteria.length})</span>
                     <ol className="mt-2 space-y-1 list-decimal list-inside">
                       {data.inclusionCriteria.map((c: string) => (
                         <li key={c} className="text-sm text-foreground">{c}</li>
@@ -430,7 +429,7 @@ export function PrismaCheckStep() {
                 )}
                 {data.exclusionCriteria?.length > 0 && (
                   <div className="p-3 rounded-lg border border-red-200 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20">
-                    <span className="text-xs font-bold text-red-700 dark:text-red-400 uppercase">Criterios de Exclusi�n ({data.exclusionCriteria.length})</span>
+                    <span className="text-xs font-bold text-red-700 dark:text-red-400 uppercase">Criterios de Exclusión ({data.exclusionCriteria.length})</span>
                     <ol className="mt-2 space-y-1 list-decimal list-inside">
                       {data.exclusionCriteria.map((c: string) => (
                         <li key={c} className="text-sm text-foreground">{c}</li>
@@ -442,12 +441,12 @@ export function PrismaCheckStep() {
             </div>
           )}
 
-          {/* --- SECCIÓN: Bases de Datos y Cadenas de B�squeda --- */}
+          {/* --- SECCIÓN: Bases de Datos y Cadenas de Búsqueda --- */}
           {queriesWithRefs.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2 border-b pb-2">
                 <Database className="h-5 w-5 text-primary" />
-                <h3 className="font-semibold text-base">Bases de Datos y Cadenas de B�squeda</h3>
+                <h3 className="font-semibold text-base">Bases de Datos y Cadenas de Búsqueda</h3>
               </div>
               <div className="space-y-3">
                 {queriesWithRefs.map((q: any) => {
@@ -455,16 +454,16 @@ export function PrismaCheckStep() {
                     .filter((f: any) => f.databaseId === q.databaseId)
                     .reduce((sum: number, f: any) => sum + (f.recordCount || 0), 0)
                   return (
-                  <div key={q.databaseId || q.databaseName} className="p-3 rounded-lg border border-border">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-semibold text-foreground">{q.databaseName || q.databaseId}</span>
-                      <Badge variant="secondary" className="text-xs">{refsCount} refs importadas</Badge>
+                    <div key={q.databaseId || q.databaseName} className="p-3 rounded-lg border border-border">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-semibold text-foreground">{q.databaseName || q.databaseId}</span>
+                        <Badge variant="secondary" className="text-xs">{refsCount} refs importadas</Badge>
+                      </div>
+                      <pre className="text-xs bg-muted/50 p-2 rounded border overflow-x-auto whitespace-pre-wrap font-mono text-foreground">{q.query}</pre>
+                      {q.explanation && (
+                        <p className="text-xs text-muted-foreground mt-1 italic">{q.explanation}</p>
+                      )}
                     </div>
-                    <pre className="text-xs bg-muted/50 p-2 rounded border overflow-x-auto whitespace-pre-wrap font-mono text-foreground">{q.query}</pre>
-                    {q.explanation && (
-                      <p className="text-xs text-muted-foreground mt-1 italic">{q.explanation}</p>
-                    )}
-                  </div>
                   )
                 })}
               </div>

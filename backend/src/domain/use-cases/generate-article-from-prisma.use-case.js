@@ -79,7 +79,8 @@ ${text}`;
       const response = await this.aiService.generateText(
         'You are a professional academic translator. Translate Spanish text to formal Academic English suitable for a Q1 journal publication.',
         prompt,
-        'chatgpt'
+        'chatgpt',
+        { temperature: 0.0 }
       );
       return response.trim();
     } catch (error) {
@@ -216,32 +217,31 @@ ${text}`;
     return classified;
   }
 
-  getEnhancedSystemPrompt() {
-    return `You are an expert in Research Methodology and Software Architecture, specialized in IEEE standards and PRISMA 2020 protocols. Your objective is to synthesize data extracted from included studies to generate a rigorous scientific manuscript.
+  getEnhancedSystemPrompt(numIncluded) {
+    return `You are an expert in Research Methodology and Software Architecture, specialized in IEEE standards and PRISMA 2020 protocols. Your objective is to synthesize data extracted from included studies ($n=${numIncluded}) to generate a rigorous scientific manuscript.
 
-**ANTI-AI WRITING STYLE:**
-- TECHNICAL DENSITY: Avoid generic introductions (e.g., "In the rapidly changing landscape..."). Start directly with technical conflict or context (e.g., "The tradeoff between code maintainability and system latency in microservices architecture...").
-- ACTIVE VOICE: Use "We analyzed", "We identified", or "We synthesized" instead of passive forms like "An analysis was performed".
-- PRECISE VOCABULARY: Use specific technical terms: abstraction penalty, overhead, throughput, bottleneck, computational cost, tradeoff, scalability, latency, etc.
-- ZERO HALLUCINATION: If data is missing from the extraction matrix, declare it as "Not Reported (N/R)" or "Unknown". NEVER invent percentages, milliseconds, or specifics.
-- CONCISENESS: Every sentence must provide technical value. Avoid filler words.
+**MASTER CONFIGURATION (HIGH FIDELITY):**
+- SINGLE SOURCE OF TRUTH (SSOT): All sections MUST be consistent with the final count of studies: $n=${numIncluded}.
+- CLARITY OVER CREATIVITY: If data is not in the source, report "Not Reported (N/R)". NEVER invent metrics.
+- IEEE STANDARDS: 
+    - Tables: Numbered with Roman numerals (e.g., Table I). Titles MUST be ABOVE the table.
+    - Figures: Numbered with Arabic numerals (e.g., Figure 1). Titles MUST be BELOW the figure.
+- ANTI-AI WRITING STYLE:
+    - TECHNICAL DENSITY: No generic intros. Start with technical conflict (e.g., "The tradeoff between code maintainability and system latency...").
+    - ACTIVE VOICE: "We analyzed", "We synthesized" (Avoid "It was analyzed").
+    - PRECISE VOCABULARY: Use technical terms (overhead, throughput, bottleneck, abstraction penalty).
 
 **YOUR ROLE:**
 - Write professional academic content following PRISMA 2020 and IEEE standards.
-- Use ONLY explicitly provided data (never invent figures, studies, or authors).
+- Use ONLY explicitly provided data from the ${numIncluded} included studies.
 - Maintain extreme methodological rigor and technical precision.
 - Write in formal Academic English.
 
-**SECTION-SPECIFIC RULES:**
-- RESULTS: ZERO authorial opinions — factual data synthesis only. Titles for TABLES must be ABOVE the table, for FIGURES must be BELOW the image.
-- DISCUSSION: Narrative analysis of Threats to Validity focusing on sample size, database bias, and technological obsolescence.
-- CONCLUSIONS: Direct answers to Research Questions based strictly on the synthesis evidence.
-
 **ABSOLUTE PROHIBITIONS:**
-- DO NOT invent data or studies.
-- DO NOT use speculative language without evidence.
-- CRITICAL: NO generic or filler sentences.
-- DO NOT use first person singular (I); use first person plural (We) or impersonal.`;
+- DO NOT invent data, percentages, or studies.
+- DO NOT use filler or flowery language (e.g., "In the rapidly changing landscape...").
+- DO NOT use generic AI muletillas (e.g., "This fascinating study...", "Crucially...").
+- DO NOT invent authors or references.`;
   }
 
   async execute(projectId) {
@@ -423,28 +423,35 @@ ${text}`;
       console.log('📸 Usando URLs directas para imágenes en lugar de base64');
       const chartPathsForArticle = chartPaths; // Usar URLs directas
 
-      // ✅ OPTIMIZACIÓN: Generar secciones en lotes paralelos para reducir tiempo total
-      console.log('📝 Generando secciones del artículo (paralelo por lotes)...');
+      // ✅ OPTIMIZACIÓN: Generar secciones en lotes paralelos para reducir total
+      // ✅ MASTER CONFIG: Configuración de IA Determinista (Temp 0.0)
+      const aiOptions = {
+        temperature: 0.0,
+        topP: 0.1,
+        topK: 1
+      };
+
+      const systemPrompt = this.getEnhancedSystemPrompt(rqsEntries.length);
 
       // Lote 1: abstract + keywords + introduction (independientes)
       const [abstract, keywords, introduction] = await Promise.all([
-        this.generateProfessionalAbstract(prismaMapping, prismaContext, rqsStats),
-        this.generateKeywords(prismaContext, rqsStats),
-        this.generateProfessionalIntroduction(prismaMapping, prismaContext, rqsEntries)
+        this.generateProfessionalAbstract(prismaMapping, prismaContext, rqsStats, aiOptions, systemPrompt),
+        this.generateKeywords(prismaContext, rqsStats, aiOptions, systemPrompt),
+        this.generateProfessionalIntroduction(prismaMapping, prismaContext, rqsEntries, aiOptions, systemPrompt)
       ]);
       console.log('   ✅ Lote 1 completado: abstract, keywords, introduction');
 
       // Lote 2: methods + results (independientes)
       const [methods, results] = await Promise.all([
         this.generateProfessionalMethods(prismaMapping, prismaContext, rqsEntries, chartPathsForArticle),
-        this.generateProfessionalResults(prismaMapping, prismaContext, rqsEntries, rqsStats, chartPathsForArticle, enhancedChartData)
+        this.generateProfessionalResults(prismaMapping, prismaContext, rqsEntries, rqsStats, chartPathsForArticle, enhancedChartData, aiOptions, systemPrompt)
       ]);
       console.log('   ✅ Lote 2 completado: methods, results');
 
       // Lote 3: discussion + conclusions (independientes)
       const [discussion, conclusions] = await Promise.all([
-        this.generateProfessionalDiscussion(prismaMapping, prismaContext, rqsStats, rqsEntries),
-        this.generateProfessionalConclusions(prismaMapping, prismaContext, rqsStats)
+        this.generateProfessionalDiscussion(prismaMapping, prismaContext, rqsStats, rqsEntries, aiOptions, systemPrompt),
+        this.generateProfessionalConclusions(prismaMapping, prismaContext, rqsStats, aiOptions, systemPrompt)
       ]);
       console.log('   ✅ Lote 3 completado: discussion, conclusions');
 
@@ -515,7 +522,7 @@ ${text}`;
   /**
    * ABSTRACT PROFESIONAL con estructura estándar de revistas Q1
    */
-  async generateProfessionalAbstract(prismaMapping, prismaContext, rqsStats) {
+  async generateProfessionalAbstract(prismaMapping, prismaContext, rqsStats, aiOptions = {}, systemPrompt = null) {
     const prompt = `Act as a senior researcher writing for a Q1 journal. Generate a structured abstract following the strict IMRAD format. ALL output MUST be in Academic English.
 
 **CONCRETE DATA AVAILABLE:**
@@ -587,7 +594,7 @@ Generate ONLY the abstract text as one continuous paragraph. ALL text MUST be in
   /**
    * KEYWORDS profesionales (obligatorio en journals IEEE/Elsevier/Springer/MDPI)
    */
-  async generateKeywords(prismaContext, rqsStats) {
+  async generateKeywords(prismaContext, rqsStats, aiOptions = {}, systemPrompt = null) {
     const prompt = `Generate keywords for a systematic review scientific article. ALL output MUST be in English.
 
 **STUDY CONTEXT:**
@@ -638,7 +645,7 @@ Generate ONLY the list of keywords separated by semicolons, without numbering or
   /**
    * INTRODUCCIÓN PROFESIONAL con revisión de literatura
    */
-  async generateProfessionalIntroduction(prismaMapping, prismaContext, rqsEntries) {
+  async generateProfessionalIntroduction(prismaMapping, prismaContext, rqsEntries, aiOptions = {}, systemPrompt = null) {
     const referencesList = rqsEntries.map((e, i) => `[${i + 1}] ${e.author} (${e.year}): ${e.title}`).join('\n');
 
     const prompt = `Write a professional academic introduction for a systematic review in a scientific journal. ALL output MUST be in Academic English. If source data below is in Spanish, translate it into English and integrate it naturally.
@@ -863,7 +870,7 @@ The synthesis was organized around the three research questions, integrating fin
   /**
    * RESULTADOS PROFESIONALES con análisis estadístico real y síntesis por RQ
    */
-  async generateProfessionalResults(prismaMapping, prismaContext, rqsEntries, rqsStats, charts = {}, enhancedChartData = null) {
+  async generateProfessionalResults(prismaMapping, prismaContext, rqsEntries, rqsStats, charts = {}, enhancedChartData = null, aiOptions = {}, systemPrompt = null) {
     // Generar análisis RQS detallado
     const rqsAnalysis = await this.generateDetailedRQSAnalysis(rqsEntries, rqsStats, prismaContext);
 
@@ -894,7 +901,7 @@ The synthesis was organized around the three research questions, integrating fin
     for (let i = 0; i < rqs.length; i++) {
         const rqLabel = translatedRQs[i] || `Research Question ${i + 1}`;
         const synthesis = rqsEntries.length > 0 
-          ? await this.synthesizeRQFindings(i, rqsEntries, prismaContext)
+          ? await this.synthesizeRQFindings(i, rqsEntries, prismaContext, aiOptions, systemPrompt)
           : 'No studies were identified that addressed this question.';
         
         const rel = rqsStats.rqRelations[`rq${i + 1}`] || { yes: 0, partial: 0 };
@@ -919,9 +926,7 @@ ${synthesis}`);
 
     let bubbleSection = '';
     if (enhancedChartData && enhancedChartData.hasBubbleData && charts.bubble_chart) {
-      bubbleSection = `\n### 3.4.4 Metrics and Technologies Mapping\n\n![Metrics vs Technologies Distribution](${charts.bubble_chart})\n*Figure 5. Distribution of reported metrics across different technologies. Bubble size represents the number of studies reporting each metric-technology combination. This visualization reveals which technologies have been most thoroughly evaluated and which metrics are most commonly used.*\n`;
-    } else if (enhancedChartData && !enhancedChartData.hasBubbleData) {
-       bubbleSection = `\n### 3.4.4 Metrics and Technologies Mapping\n\nNo structured quantitative metrics could be consistently mapped across the included studies to generate a dimension mapping. The synthesis relies primarily on qualitative findings.\n`;
+      bubbleSection = `\n### 3.4.4 Metrics and Technologies Mapping\n\n![Metrics vs Technologies Distribution](${charts.bubble_chart})\n*Figure 5. Distribution of reported metrics across different technologies. Bubble size represents the number of studies reporting each metric-technology combination.*\n`;
     }
 
     let keywordSection = '';
@@ -932,53 +937,51 @@ ${synthesis}`);
     let synthesisSection = '';
     if (enhancedChartData && enhancedChartData.hasSynthesisData) {
       const summaryTable = this.generateTechnicalSynthesisMarkdownTable(enhancedChartData.technical_synthesis.studies);
-      synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\n**Table V: Technical Performance Synthesis Matrix**\n\n${summaryTable}\n*Note: N/R indicates Not Reported.*\n`;
+      synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\n**Table IV: Technical Performance Synthesis Matrix**\n\n${summaryTable}\n*Note: N/R indicates Not Reported.*\n`;
     } else if (enhancedChartData && !enhancedChartData.hasSynthesisData) {
-      synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\nDirect quantitative comparison of technical performance could not be performed due to the lack of standardized metrics across the included studies. Future research should prioritize standardizing reporting metrics for this domain.\n`;
+      synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\nDirect quantitative comparison of technical performance could not be performed due to the lack of standardized metrics across the included studies.\n`;
     }
 
-    return `## 3.1 Study Selection
+    // Actualizar Títulos de Tablas y Figuras según IEEE (Tablas ARRIBA, Figuras ABAJO)
+    let resultsText = `## 3.1 Study Selection
 
 ${studySelection}
 
-Figure 1 presents the complete PRISMA flow diagram of the selection process. The initial search identified **${totalIdentified} records** across the consulted databases. After duplicate removal (n=${duplicatesRemoved}), **${afterDedup} unique records** were screened by title and abstract.
+The search identified **${totalIdentified} records**. After duplicate removal (n=${duplicatesRemoved}), **${afterDedup} unique records** were screened.
 
-The prioritization of these records was guided by the AI-assisted hybrid screening (Section 2.4). Figure 2 illustrates the distribution of relevance scores across the dataset. The application of the elbow method allowed for a data-driven threshold, ensuring that all potentially relevant literature was captured before manual review.
+${charts.scree ? `![Priority Screening Score Distribution](${charts.scree})\n*Figure 2. Priority screening score distribution (Scree Plot).*\n` : ''}
 
-${charts.scree ? `![Priority Screening Score Distribution](${charts.scree})\n*Figure 2. Priority screening score distribution (Scree Plot). The elbow point indicates the optimal cutoff threshold for relevance, separating high-confidence candidates from the low-relevance tail.*\n` : ''}
+${prismaContext.screening.phase1 ? `The hybrid screening processed all ${afterDedup} unique records. Phase 1 embeddings classified ${prismaContext.screening.phase1.highConfidenceInclude} high-confidence includes. Phase 2 LLM analysis classified ${prismaContext.screening.phase2?.included || 0} additional includes.` : ''}
 
-${prismaContext.screening.phase1 ? `The hybrid screening processed all ${afterDedup} unique records. In Phase 1, the embedding model classified ${prismaContext.screening.phase1.highConfidenceInclude} references as high-confidence includes, ${prismaContext.screening.phase1.highConfidenceExclude} as high-confidence excludes, and ${prismaContext.screening.phase1.greyZone} as grey-zone.${prismaContext.screening.phase2 ? ` In Phase 2, the LLM analyzed the ${prismaContext.screening.phase2.analyzed} grey-zone references, classifying ${prismaContext.screening.phase2.included} as included, ${prismaContext.screening.phase2.excluded} as excluded, and ${prismaContext.screening.phase2.manual} for manual review.` : ''} All AI-generated rankings were validated using the elbow method to ensure recruitment of all high-relevance literature.` : ''}
+During title and abstract screening, **${excludedTitleAbstract} records were excluded**. A total of **${fullTextAssessed} articles** were assessed in full-text, from which **${excludedFullText} were excluded**. Finally, **${finalIncluded} studies** were manually included.
 
-During title and abstract screening, **${excludedTitleAbstract} records were excluded**${Object.keys(prismaContext.screening.screeningExclusionReasons || {}).length > 0 ? `: ${Object.entries(prismaContext.screening.screeningExclusionReasons || {}).slice(0, 5).map(([reason, count]) => `${reason} (n=${count})`).join('; ')}` : ''}.
-
-Of these, **${fullTextAssessed} articles** were retrieved for full-text evaluation. A total of **${excludedFullText} articles were excluded** after full-text assessment${Object.keys(prismaContext.screening.exclusionReasons || {}).length > 0 ? `, primarily due to: ${Object.entries(prismaContext.screening.exclusionReasons || {}).slice(0, 3).map(([reason, count]) => `${reason} (n=${count})`).join(', ')}` : ''}. Finally, **${finalIncluded} studies** were manually included in the qualitative synthesis.
-
-${charts.prisma ? `![PRISMA 2020 Flow Diagram](${charts.prisma})` : '**[FIGURE 1: PRISMA 2020 Flow Diagram]**'}
-*Figure 1. PRISMA 2020 flow diagram of the study selection process.*
+${charts.prisma ? `![PRISMA 2020 Flow Diagram](${charts.prisma})\n*Figure 1. PRISMA 2020 flow diagram.*` : ''}
 
 ## 3.2 Characteristics of Included Studies
 
-${rqsAnalysis || prismaMapping.results.studyCharacteristics || 'The included studies were analyzed according to the RQS (Research Question Schema) to extract structured data relevant to the research questions.'} Table I summarizes the key technical characteristics and contexts of the ${rqsStats.total} selected primary studies. 
+${rqsAnalysis || 'The included studies were analyzed using the RQS schema.'} 
+
+**Table I: General Characteristics of Included Primary Studies (n=${rqsStats.total})**
 
 ${this.generateTable1Professional(rqsEntries)}
 
-${charts.temporal_distribution ? `\n![Temporal Distribution of Included Studies](${charts.temporal_distribution})\n*Figure 3. Temporal distribution of the ${rqsStats.total} included studies (${rqsStats.yearRange.min}-${rqsStats.yearRange.max}). The trend line indicates the evolution of research interest in the field over time.*\n` : ''}
+${charts.temporal_distribution ? `\n![Temporal Distribution](${charts.temporal_distribution})\n*Figure 3. Temporal distribution (${rqsStats.yearRange.min}-${rqsStats.yearRange.max}).*\n` : ''}
 
-## 3.3 Risk of Bias in Included Studies
+## 3.3 Methodological Quality
 
 ${riskOfBiasResults}
 
+**Table II: Methodological Quality and Risk of Bias Assessment**
+
 ${this.generateTable3Professional(rqsEntries)}
 
-${charts.quality_assessment ? `\n![Quality Assessment Results](${charts.quality_assessment})\n*Figure 6. Methodological quality assessment results across ${rqsStats.total} included studies using standardized quality criteria. The stacked bars show the distribution of Yes/Partial/No responses for each quality criterion.*\n` : ''}
+${charts.quality_assessment ? `\n![Quality Assessment](${charts.quality_assessment})\n*Figure 6. Methodological quality assessment results.*\n` : ''}
 
 ## 3.4 Synthesis of Results by Research Question
 
-The following subsections synthesize the evidence extracted from the primary studies to address the defined research questions.
-
 ${rqSyntheticFindings}
 
-The comprehensive synthesis of technical findings and performance metrics across all included studies is consolidated in Table II.
+**Table III: Synthesis of Main Results and Reported Technical Metrics**
 
 ${this.generateTable2Professional(rqsEntries, prismaContext.protocol || {})}
 
@@ -987,6 +990,8 @@ ${bubbleSection}
 ${synthesisSection}
 
 ${keywordSection}`;
+
+    return resultsText;
   }
 
 
@@ -1018,9 +1023,14 @@ ${keywordSection}`;
     
     const separatorRow = displayCols.map(() => '---').join(' | ');
     
-    const dataRows = studiesArray.map(study => {
+    const dataRows = studiesArray.map((study, idx) => {
       return displayCols.map(col => {
          const val = study[col];
+         if (col === 'study') {
+           // REGLA: Formato IEEE "Author et al. [Reference#]"
+           const authorText = val || 'Unknown';
+           return `${authorText} [${idx + 1}]`;
+         }
          if (val === null || val === undefined || val === '') return 'N/R';
          return `${val}`.replace(/\|/g, '-'); // Evitar romper markdown
       }).join(' | ');
@@ -1032,7 +1042,7 @@ ${keywordSection}`;
   /**
    * Análisis RQS detallado y profesional con estadísticas
    */
-  async generateDetailedRQSAnalysis(rqsEntries, rqsStats, prismaContext) {
+  async generateDetailedRQSAnalysis(rqsEntries, rqsStats, prismaContext, aiOptions = {}, systemPrompt = null) {
     const prompt = `Generate a professional academic descriptive analysis of the characteristics of the ${rqsStats.total} included studies. ALL output MUST be in Academic English. If any source data is in Spanish, translate it into English.
 
 **DATOS ESTADÍSTICOS REALES (NO INVENTES NADA):**
@@ -1083,9 +1093,10 @@ Generate 2-3 academic paragraphs (400-500 words total) that:
 Respond ONLY with the analysis paragraphs in English:`;
 
     const response = await this.aiService.generateText(
-      this.getEnhancedSystemPrompt(),
+      systemPrompt || this.getEnhancedSystemPrompt(rqsStats.total),
       prompt,
-      'chatgpt'
+      'chatgpt',
+      aiOptions
     );
 
     return `### 3.2.1 Descriptive analysis based on RQS data
@@ -1100,7 +1111,7 @@ ${this.generateTable2Professional(rqsEntries)}`;
   /**
    * Sintetizar hallazgos para RQ1
    */
-  async synthesizeRQFindings(rqIndex, rqsEntries, prismaContext) {
+  async synthesizeRQFindings(rqIndex, rqsEntries, prismaContext, aiOptions = {}, systemPrompt = null) {
     const rqKey = `rq${rqIndex + 1}Relation`;
     const relevantStudies = rqsEntries.map((e, index) => ({...e, globalIndex: index + 1}))
       .filter(e => e[rqKey] === 'yes' || e[rqKey] === 'partial');
@@ -1161,9 +1172,10 @@ Generate 2-3 academic paragraphs (400-500 words) following this structure:
 Respond with paragraphs only (no section headers):`;
 
     const response = await this.aiService.generateText(
-      this.getEnhancedSystemPrompt(),
+      systemPrompt || this.getEnhancedSystemPrompt(relevantStudies.length),
       prompt,
-      'chatgpt'
+      'chatgpt',
+      aiOptions
     );
 
     return response.trim();
@@ -1292,7 +1304,7 @@ ${rqsEntries.map((entry, i) => {
   /**
    * DISCUSIÓN PROFESIONAL con interpretación crítica
    */
-  async generateProfessionalDiscussion(prismaMapping, prismaContext, rqsStats, rqsEntries) {
+  async generateProfessionalDiscussion(prismaMapping, prismaContext, rqsStats, rqsEntries, aiOptions = {}, systemPrompt = null) {
     const referencesList = rqsEntries.map((e, i) => `[${i + 1}] ${e.author} (${e.year})`).join('\n');
 
     const prompt = `Write a professional academic DISCUSSION section integrating the findings of this systematic review. ALL output MUST be in Academic English.
@@ -1374,9 +1386,10 @@ Format as: "### Threats to Validity" followed by continuous prose discussing eac
 Generate ONLY the discussion text in English:`;
 
     const response = await this.aiService.generateText(
-      this.getEnhancedSystemPrompt(),
+      systemPrompt || this.getEnhancedSystemPrompt(rqsStats.total),
       prompt,
-      'chatgpt'
+      'chatgpt',
+      aiOptions
     );
 
     return response.trim();
@@ -1385,7 +1398,7 @@ Generate ONLY the discussion text in English:`;
   /**
    * CONCLUSIONES PROFESIONALES concisas y accionables
    */
-  async generateProfessionalConclusions(prismaMapping, prismaContext, rqsStats) {
+  async generateProfessionalConclusions(prismaMapping, prismaContext, rqsStats, aiOptions = {}, systemPrompt = null) {
     const prompt = `Write an academic CONCLUSIONS section that synthesizes the main findings of this systematic review. ALL output MUST be in Academic English.
 
 **CONTEXT:**
@@ -1466,9 +1479,10 @@ Close with a statement about:
 Generate the complete Conclusions section with all 5 subsections:`;
 
     const response = await this.aiService.generateText(
-      this.getEnhancedSystemPrompt(),
+      systemPrompt || this.getEnhancedSystemPrompt(rqsStats.total),
       prompt,
-      'chatgpt'
+      'chatgpt',
+      aiOptions
     );
 
     // Clean duplicate titles that AI may generate at the beginning

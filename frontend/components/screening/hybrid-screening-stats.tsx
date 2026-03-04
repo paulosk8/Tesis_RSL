@@ -84,118 +84,120 @@ export function HybridScreeningStats({ result }: HybridScreeningStatsProps) {
           Procesadas {summary.processed} de {summary.total} referencias en {durationSeconds}s
         </CardDescription>
       </CardHeader>
-      
+
       <CardContent className="space-y-4">
-{/* Gráfico Visual de Distribución */}
-                <div className="space-y-3">
-                  <h4 className="font-semibold text-sm flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                    Gráfico de Punto de Inflexión ("Codo")
-                  </h4>
-                  <p className="text-xs text-muted-foreground">
-                    Distribución visual de puntajes ordenados de mayor a menor. Muestra dónde se encuentran los artículos en el rango de similitud.
-                  </p>
-                  
-                  <div className="relative h-64 bg-muted/30 rounded-lg p-4 border border-primary/20">
-                    {/* Eje Y (Puntajes) */}
-                    <div className="absolute left-0 top-0 bottom-0 w-12 flex flex-col justify-between text-xs text-muted-foreground py-4">
-                      <span>{(result.statistics.max * 100).toFixed(0)}%</span>
-                      <span>{(result.statistics.mean * 100).toFixed(0)}%</span>
-                      <span>{(result.statistics.min * 100).toFixed(0)}%</span>
-                    </div>
+        {/* Gráfico Visual de Distribución (Solo si hay estadísticas) */}
+        {result.statistics && (
+          <div className="space-y-3">
+            <h4 className="font-semibold text-sm flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-primary" />
+              Gráfico de Punto de Inflexión ("Codo")
+            </h4>
+            <p className="text-xs text-muted-foreground">
+              Distribución visual de puntajes ordenados de mayor a menor. Muestra dónde se encuentran los artículos en el rango de similitud.
+            </p>
 
-                    {/* Área del gráfico */}
-                    <div className="ml-12 mr-4 h-full relative">
-                      {/* Líneas de percentiles */}
-                      <div 
-                        className="absolute left-0 right-0 border-t-2 border-dashed border-blue-500 dark:border-blue-400"
-                        style={{ top: `${(1 - result.statistics.percentile95 / result.statistics.max) * 90}%` }}
-                      >
-                        <span className="absolute -top-2 right-0 text-xs text-blue-600 dark:text-blue-400 bg-background px-1 whitespace-nowrap">
-                          Top 5%: {(result.statistics.percentile95 * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                      <div 
-                        className="absolute left-0 right-0 border-t-2 border-dashed border-blue-400 dark:border-blue-500"
-                        style={{ top: `${(1 - result.statistics.percentile90 / result.statistics.max) * 90}%` }}
-                      >
-                        <span className="absolute -top-2 right-0 text-xs text-blue-600 dark:text-blue-400 bg-background px-1 whitespace-nowrap">
-                          Top 10%: {(result.statistics.percentile90 * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                      <div 
-                        className="absolute left-0 right-0 border-t-2 border-dashed border-green-500 dark:border-green-400"
-                        style={{ top: `${(1 - result.statistics.percentile75 / result.statistics.max) * 90}%` }}
-                      >
-                        <span className="absolute -top-2 right-0 text-xs text-green-600 dark:text-green-400 bg-background px-1 whitespace-nowrap">
-                          Top 25%: {(result.statistics.percentile75 * 100).toFixed(1)}%
-                        </span>
-                      </div>
-                      <div 
-                        className="absolute left-0 right-0 border-t-2 border-dashed border-orange-400 dark:border-orange-500"
-                        style={{ top: `${(1 - result.statistics.percentile50 / result.statistics.max) * 90}%` }}
-                      >
-                        <span className="absolute -top-2 right-0 text-xs text-orange-600 dark:text-orange-400 bg-background px-1 whitespace-nowrap">
-                          Mediana: {(result.statistics.percentile50 * 100).toFixed(1)}%
-                        </span>
-                      </div>
+            <div className="relative h-64 bg-muted/30 rounded-lg p-4 border border-primary/20">
+              {/* Eje Y (Puntajes) */}
+              <div className="absolute left-0 top-0 bottom-0 w-12 flex flex-col justify-between text-xs text-muted-foreground py-4">
+                <span>{(result.statistics.max * 100).toFixed(0)}%</span>
+                <span>{(result.statistics.mean * 100).toFixed(0)}%</span>
+                <span>{(result.statistics.min * 100).toFixed(0)}%</span>
+              </div>
 
-                      {/* Curva simulada (usando degradado) */}
-                      <div 
-                        className="absolute inset-0 bg-gradient-to-br from-primary/50 via-primary/30 to-primary/10 rounded"
-                        style={{
-                          clipPath: 'polygon(0 10%, 20% 20%, 40% 40%, 60% 60%, 80% 75%, 100% 90%)'
-                        }}
-                      />
-                      
-                      {/* Puntos de datos simulados */}
-                      {/* eslint-disable-next-line react/no-array-index-key */}
-                      {Array.from({ length: Math.min(summary.total, 40) }).map((_, idx) => {
-                        // Simular distribución decreciente
-                        const normalizedScore = Math.max(0.1, 1 - Math.pow(idx / summary.total, 0.7))
-                        const score = result.statistics.min + (result.statistics.max - result.statistics.min) * normalizedScore
-                        
-                        return (
-                          <div
-                            key={`datapoint-${idx}`}
-                            className="absolute w-2 h-2 bg-primary rounded-full"
-                            style={{
-                              left: `${(idx / summary.total) * 95}%`,
-                              top: `${(1 - score / result.statistics.max) * 90}%`
-                            }}
-                          />
-                        )
-                      })}
+              {/* Área del gráfico */}
+              <div className="ml-12 mr-4 h-full relative">
+                {/* Líneas de percentiles */}
+                <div
+                  className="absolute left-0 right-0 border-t-2 border-dashed border-blue-500 dark:border-blue-400"
+                  style={{ top: `${(1 - result.statistics.percentile95 / result.statistics.max) * 90}%` }}
+                >
+                  <span className="absolute -top-2 right-0 text-xs text-blue-600 dark:text-blue-400 bg-background px-1 whitespace-nowrap">
+                    Top 5%: {(result.statistics.percentile95 * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div
+                  className="absolute left-0 right-0 border-t-2 border-dashed border-blue-400 dark:border-blue-500"
+                  style={{ top: `${(1 - result.statistics.percentile90 / result.statistics.max) * 90}%` }}
+                >
+                  <span className="absolute -top-2 right-0 text-xs text-blue-600 dark:text-blue-400 bg-background px-1 whitespace-nowrap">
+                    Top 10%: {(result.statistics.percentile90 * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div
+                  className="absolute left-0 right-0 border-t-2 border-dashed border-green-500 dark:border-green-400"
+                  style={{ top: `${(1 - result.statistics.percentile75 / result.statistics.max) * 90}%` }}
+                >
+                  <span className="absolute -top-2 right-0 text-xs text-green-600 dark:text-green-400 bg-background px-1 whitespace-nowrap">
+                    Top 25%: {(result.statistics.percentile75 * 100).toFixed(1)}%
+                  </span>
+                </div>
+                <div
+                  className="absolute left-0 right-0 border-t-2 border-dashed border-orange-400 dark:border-orange-500"
+                  style={{ top: `${(1 - result.statistics.percentile50 / result.statistics.max) * 90}%` }}
+                >
+                  <span className="absolute -top-2 right-0 text-xs text-orange-600 dark:text-orange-400 bg-background px-1 whitespace-nowrap">
+                    Mediana: {(result.statistics.percentile50 * 100).toFixed(1)}%
+                  </span>
+                </div>
 
-                      {/* Línea vertical del codo (si está disponible) */}
-                      {result.recommendedCutoff && (
-                        <div 
-                          className="absolute top-0 bottom-0 border-l-2 border-purple-600 dark:border-purple-400 z-10"
-                          style={{ 
-                            left: `${(result.recommendedCutoff.articlesToReview / summary.total) * 95}%` 
-                          }}
-                        >
-                          <div className="absolute -bottom-6 -left-12 text-xs text-purple-600 dark:text-purple-400 bg-background px-1 font-semibold whitespace-nowrap">
-                            ↑ Codo óptimo
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                {/* Curva simulada (usando degradado) */}
+                <div
+                  className="absolute inset-0 bg-gradient-to-br from-primary/50 via-primary/30 to-primary/10 rounded"
+                  style={{
+                    clipPath: 'polygon(0 10%, 20% 20%, 40% 40%, 60% 60%, 80% 75%, 100% 90%)'
+                  }}
+                />
 
-                    {/* Eje X (Número de artículo) */}
-                    <div className="absolute bottom-0 left-12 right-4 h-8 flex justify-between items-end text-xs text-muted-foreground">
-                      <span>1</span>
-                      <span>Artículo</span>
-                      <span>{summary.total}</span>
+                {/* Puntos de datos simulados */}
+                {/* eslint-disable-next-line react/no-array-index-key */}
+                {Array.from({ length: Math.min(summary.total, 40) }).map((_, idx) => {
+                  // Simular distribución decreciente
+                  const normalizedScore = Math.max(0.1, 1 - Math.pow(idx / summary.total, 0.7))
+                  const score = result.statistics!.min + (result.statistics!.max - result.statistics!.min) * normalizedScore
+
+                  return (
+                    <div
+                      key={`datapoint-${idx}`}
+                      className="absolute w-2 h-2 bg-primary rounded-full"
+                      style={{
+                        left: `${(idx / summary.total) * 95}%`,
+                        top: `${(1 - score / result.statistics!.max) * 90}%`
+                      }}
+                    />
+                  )
+                })}
+
+                {/* Línea vertical del codo (si está disponible) */}
+                {result.recommendedCutoff && (
+                  <div
+                    className="absolute top-0 bottom-0 border-l-2 border-purple-600 dark:border-purple-400 z-10"
+                    style={{
+                      left: `${(result.recommendedCutoff.articlesToReview / summary.total) * 95}%`
+                    }}
+                  >
+                    <div className="absolute -bottom-6 -left-12 text-xs text-purple-600 dark:text-purple-400 bg-background px-1 font-semibold whitespace-nowrap">
+                      ↑ Codo óptimo
                     </div>
                   </div>
+                )}
+              </div>
 
-                  <p className="text-xs text-muted-foreground">
-                    <strong>Interpretación:</strong> Cada punto representa un artículo ordenado por similitud. 
-                    Las líneas horizontales muestran los percentiles clave. 
-                    {result.recommendedCutoff && ' La línea púrpura vertical marca el punto de inflexión óptimo (codo).'}
-                  </p>
-                </div>
+              {/* Eje X (Número de artículo) */}
+              <div className="absolute bottom-0 left-12 right-4 h-8 flex justify-between items-end text-xs text-muted-foreground">
+                <span>1</span>
+                <span>Artículo</span>
+                <span>{summary.total}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-muted-foreground">
+              <strong>Interpretación:</strong> Cada punto representa un artículo ordenado por similitud.
+              Las líneas horizontales muestran los percentiles clave.
+              {result.recommendedCutoff && ' La línea púrpura vertical marca el punto de inflexión óptimo (codo).'}
+            </p>
+          </div>
+        )}
 
         {/* Resultados Finales siempre visibles */}
         <div className="space-y-3">
@@ -249,10 +251,10 @@ export function HybridScreeningStats({ result }: HybridScreeningStatsProps) {
               {isOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             </Button>
           </CollapsibleTrigger>
-          
+
           <CollapsibleContent className="space-y-4 pt-4">
             <Separator />
-            
+
             {/* Fase 1: Embeddings */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
@@ -264,7 +266,7 @@ export function HybridScreeningStats({ result }: HybridScreeningStatsProps) {
                   Análisis masivo
                 </Badge>
               </div>
-              
+
               <div className="grid grid-cols-3 gap-2">
                 <div className="border border-primary/20 rounded-md p-3">
                   <div className="flex items-center gap-1 text-green-600 dark:text-green-400 mb-1">
@@ -274,7 +276,7 @@ export function HybridScreeningStats({ result }: HybridScreeningStatsProps) {
                   <p className="text-xl font-bold text-foreground">{phase1.highConfidenceInclude}</p>
                   <p className="text-xs text-muted-foreground">Similitud &gt;30%</p>
                 </div>
-                
+
                 <div className="border border-primary/20 rounded-md p-3">
                   <div className="flex items-center gap-1 text-red-600 dark:text-red-400 mb-1">
                     <XCircle className="h-3 w-3" />
@@ -283,7 +285,7 @@ export function HybridScreeningStats({ result }: HybridScreeningStatsProps) {
                   <p className="text-xl font-bold text-foreground">{phase1.highConfidenceExclude}</p>
                   <p className="text-xs text-muted-foreground">Similitud &lt;10%</p>
                 </div>
-                
+
                 <div className="border border-primary/20 rounded-md p-3">
                   <div className="flex items-center gap-1 text-amber-600 dark:text-amber-400 mb-1">
                     <AlertCircle className="h-3 w-3" />
@@ -313,7 +315,7 @@ export function HybridScreeningStats({ result }: HybridScreeningStatsProps) {
                   Análisis experto
                 </Badge>
               </div>
-              
+
               <div className="border border-primary/20 rounded-md p-3">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-sm font-medium text-foreground">Referencias analizadas</span>
@@ -337,7 +339,7 @@ export function HybridScreeningStats({ result }: HybridScreeningStatsProps) {
             {result.statistics && (
               <>
                 <Separator />
-                
+
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="font-semibold text-sm">Estadísticas de Similitud</h4>
@@ -345,26 +347,26 @@ export function HybridScreeningStats({ result }: HybridScreeningStatsProps) {
                       Método Elbow aplicado
                     </Badge>
                   </div>
-                  
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div className="border border-primary/20 rounded-md p-2">
                       <p className="text-xs text-muted-foreground">Mínimo</p>
                       <p className="text-sm font-bold text-foreground">{(result.statistics.min * 100).toFixed(2)}%</p>
                       <p className="text-xs text-muted-foreground">Artículo menos similar</p>
                     </div>
-                    
+
                     <div className="border border-primary/20 rounded-md p-2">
                       <p className="text-xs text-muted-foreground">Máximo</p>
                       <p className="text-sm font-bold text-foreground">{(result.statistics.max * 100).toFixed(2)}%</p>
                       <p className="text-xs text-muted-foreground">Artículo más similar</p>
                     </div>
-                    
+
                     <div className="border border-primary/20 rounded-md p-2">
                       <p className="text-xs text-muted-foreground">Media</p>
                       <p className="text-sm font-bold text-foreground">{(result.statistics.mean * 100).toFixed(2)}%</p>
                       <p className="text-xs text-muted-foreground">Similitud promedio</p>
                     </div>
-                    
+
                     <div className="border border-primary/20 rounded-md p-2">
                       <p className="text-xs text-muted-foreground">Mediana</p>
                       <p className="text-sm font-bold text-foreground">{(result.statistics.median * 100).toFixed(2)}%</p>
@@ -375,26 +377,26 @@ export function HybridScreeningStats({ result }: HybridScreeningStatsProps) {
 
                 <div className="space-y-3">
                   <h4 className="font-semibold text-sm">Distribución por Percentiles</h4>
-                  
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                     <div className="border border-blue-300 dark:border-blue-700 rounded-md p-2">
                       <p className="text-xs text-muted-foreground">Top 5% (P95)</p>
                       <p className="text-sm font-bold text-blue-700 dark:text-blue-400">{(result.statistics.percentile95 * 100).toFixed(2)}%</p>
                       <p className="text-xs text-muted-foreground">5% más similares</p>
                     </div>
-                    
+
                     <div className="border border-blue-300 dark:border-blue-700 rounded-md p-2">
                       <p className="text-xs text-muted-foreground">Top 10% (P90)</p>
                       <p className="text-sm font-bold text-blue-700 dark:text-blue-400">{(result.statistics.percentile90 * 100).toFixed(2)}%</p>
                       <p className="text-xs text-muted-foreground">10% más similares</p>
                     </div>
-                    
+
                     <div className="border border-primary/20 rounded-md p-2">
                       <p className="text-xs text-muted-foreground">Top 25% (P75)</p>
                       <p className="text-sm font-bold text-foreground">{(result.statistics.percentile75 * 100).toFixed(2)}%</p>
                       <p className="text-xs text-muted-foreground">25% más similares</p>
                     </div>
-                    
+
                     <div className="border border-primary/20 rounded-md p-2">
                       <p className="text-xs text-muted-foreground">Mediana (P50)</p>
                       <p className="text-sm font-bold text-foreground">{(result.statistics.percentile50 * 100).toFixed(2)}%</p>
@@ -403,7 +405,7 @@ export function HybridScreeningStats({ result }: HybridScreeningStatsProps) {
                   </div>
                 </div>
 
-                
+
 
                 {result.recommendedCutoff && (
                   <div className="bg-green-50 dark:bg-green-950/20 border border-green-300 dark:border-green-700 rounded-lg p-3">
@@ -414,7 +416,7 @@ export function HybridScreeningStats({ result }: HybridScreeningStatsProps) {
                         <p className="text-xs text-muted-foreground">
                           Este es el punto de inflexión donde la relación calidad/cantidad es óptima
                         </p>
-                        
+
                         <div className="grid grid-cols-2 gap-2 mt-2">
                           <div className="bg-white dark:bg-green-950/40 p-2 rounded border border-green-200 dark:border-green-800">
                             <p className="text-xs text-muted-foreground">Umbral Recomendado</p>
@@ -423,7 +425,7 @@ export function HybridScreeningStats({ result }: HybridScreeningStatsProps) {
                             </p>
                             <p className="text-xs text-muted-foreground">Artículos con similitud ≥ este valor</p>
                           </div>
-                          
+
                           <div className="bg-white dark:bg-green-950/40 p-2 rounded border border-green-200 dark:border-green-800">
                             <p className="text-xs text-muted-foreground">Artículos a Revisar</p>
                             <p className="text-lg font-bold text-green-700 dark:text-green-400">

@@ -20,11 +20,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 
-import { 
-  Sparkles, 
-  Loader2, 
-  Search, 
-  Copy, 
+import {
+  Sparkles,
+  Loader2,
+  Search,
+  Copy,
   AlertCircle,
   CheckCircle2,
   Database,
@@ -44,29 +44,29 @@ interface ImportReferencesWrapperProps {
   query: any
   data: any
   updateData: (updates: any) => void
-  createTemporaryProjectForImport: () => Promise<void>
+  createTemporaryProjectForImport: () => Promise<string> | Promise<void>
   setImportedCounts: React.Dispatch<React.SetStateAction<Record<string, number>>>
   importedCounts: Record<string, number>
   toast: any
 }
 
-function ImportReferencesWrapper({ 
-  query, 
-  data, 
-  updateData, 
-  createTemporaryProjectForImport, 
-  setImportedCounts, 
-  importedCounts, 
-  toast 
+function ImportReferencesWrapper({
+  query,
+  data,
+  updateData,
+  createTemporaryProjectForImport,
+  setImportedCounts,
+  importedCounts,
+  toast
 }: ImportReferencesWrapperProps) {
   const [isCreatingProject, setIsCreatingProject] = useState(false)
-  
+
   const handleImportClick = async () => {
     if (data.projectId) {
       // Proyecto ya existe, proceder normalmente
       return
     }
-    
+
     // Crear proyecto temporal antes de la importación
     setIsCreatingProject(true)
     try {
@@ -78,9 +78,9 @@ function ImportReferencesWrapper({
       setIsCreatingProject(false)
     }
   }
-  
+
   const projectId = data.projectId
-  
+
   return (
     <div className="text-center">
       {projectId ? (
@@ -94,7 +94,7 @@ function ImportReferencesWrapper({
               ...prev,
               [query.databaseId]: (prev[query.databaseId] || 0) + count
             }))
-            
+
             // Actualizar uploadedFiles en el context
             const newUploadedFile = {
               filename: fileInfo?.filename || `import_${query.databaseName}.csv`,
@@ -105,7 +105,7 @@ function ImportReferencesWrapper({
               databaseName: query.databaseName,
               data: []
             }
-            
+
             updateData({
               searchPlan: {
                 ...data.searchPlan,
@@ -115,7 +115,7 @@ function ImportReferencesWrapper({
                 ]
               }
             })
-            
+
             toast({
               title: "✅ Referencias importadas",
               description: `${count} referencias cargadas de ${query.databaseName}`
@@ -124,8 +124,8 @@ function ImportReferencesWrapper({
           onClick={handleImportClick}
         />
       ) : (
-        <Button 
-          size="sm" 
+        <Button
+          size="sm"
           variant="outline"
           disabled={isCreatingProject}
           onClick={async (e) => {
@@ -184,7 +184,7 @@ const DATABASE_ADVANCED_SEARCH_URLS: Record<string, string> = {
   springer: "https://link.springer.com/advanced-search",
   wiley: "https://onlinelibrary.wiley.com/advanced/search",
   webofscience: "https://www.webofscience.com/wos/woscc/advanced-search",
-  
+
   // Medicina y Ciencias de la Salud
   pubmed: "https://pubmed.ncbi.nlm.nih.gov/advanced/",
   cinahl: "https://www.ebsco.com/products/research-databases/cinahl-database",
@@ -192,7 +192,7 @@ const DATABASE_ADVANCED_SEARCH_URLS: Record<string, string> = {
   embase: "https://www.embase.com/search/advanced",
   lilacs: "https://lilacs.bvsalud.org/en/",
   psycinfo: "https://www.apa.org/pubs/databases/psycinfo",
-  
+
   // Ciencias Sociales y Humanidades
   eric: "https://eric.ed.gov/?advanced",
   jstor: "https://www.jstor.org/action/doAdvancedSearch",
@@ -200,12 +200,12 @@ const DATABASE_ADVANCED_SEARCH_URLS: Record<string, string> = {
   taylor: "https://www.tandfonline.com/action/advancedSearch",
   econlit: "https://www.aeaweb.org/econlit",
   sociological: "https://journals.sagepub.com/home/abs",
-  
+
   // Arquitectura, Diseño y Urbanismo
   avery: "https://library.columbia.edu/libraries/avery.html",
   artbibliographies: "https://about.proquest.com/en/products-services/art_sales/",
   designandapplied: "https://about.proquest.com/en/products-services/daai/",
-  
+
   // Generales
   google_scholar: "https://scholar.google.com/advanced_scholar_search",
   doaj: "https://doaj.org/search",
@@ -223,7 +223,7 @@ const ACADEMIC_DATABASES: Record<string, { name: string }> = {
 export function SearchPlanStep() {
   const { data, updateData } = useWizard()
   const { toast } = useToast()
-  
+
   const [selectedDatabases, setSelectedDatabases] = useState<string[]>(data.searchPlan?.databases || [])
   const [queries, setQueries] = useState<any[]>(data.searchPlan?.searchQueries || [])
   const [isGenerating, setIsGenerating] = useState(false)
@@ -252,7 +252,7 @@ export function SearchPlanStep() {
         return
       }
       setLoadingDatabases(true)
-      
+
       try {
         const result = await apiClient.request('/api/ai/detect-research-area', {
           method: 'POST',
@@ -275,7 +275,7 @@ export function SearchPlanStep() {
         }
       } catch (error) {
         console.error('⚠️ Error llamando al backend, usando bases de datos locales:', error)
-        
+
         // FALLBACK: Usar bases de datos predefinidas localmente
         const localDatabases = getLocalDatabasesByArea(data.researchArea)
         setDetectedArea(data.researchArea)
@@ -292,7 +292,7 @@ export function SearchPlanStep() {
 
     fetchDatabasesByArea()
   }, [data.researchArea])
-  
+
   // Función fallback para obtener bases de datos localmente
   const getLocalDatabasesByArea = (area: string) => {
     const databasesByArea: Record<string, any[]> = {
@@ -329,9 +329,9 @@ export function SearchPlanStep() {
         { id: 'webofscience', name: 'Web of Science', url: 'https://www.webofscience.com', hasAPI: false }
       ]
     }
-    
+
     const databases = databasesByArea[area] || databasesByArea['ingenieria-tecnologia']
-    
+
     return databases.map(db => ({
       ...db,
       icon: DATABASE_ICONS[db.id] || "📚"
@@ -356,8 +356,8 @@ export function SearchPlanStep() {
       updateData({
         searchPlan: {
           ...data.searchPlan,
-          databases: selectedDatabases,
-          searchQueries: queries
+          databases: selectedDatabases as any,
+          searchQueries: queries as any
         }
       })
     }
@@ -374,33 +374,33 @@ export function SearchPlanStep() {
       })
       return
     }
-    
+
     // Remover de bases seleccionadas
     setSelectedDatabases(prev => prev.filter(id => id !== databaseId))
-    
+
     // Remover queries relacionadas
     const updatedQueries = queries.filter(q => q.databaseId !== databaseId)
     setQueries(updatedQueries)
-    
+
     // Remover contador de importaciones
     setImportedCounts(prev => {
       const newCounts = { ...prev }
       delete newCounts[databaseId]
       return newCounts
     })
-    
+
     // Actualizar contexto del wizard
     updateData({
       searchPlan: {
         ...data.searchPlan,
-        databases: selectedDatabases.filter(id => id !== databaseId),
-        searchQueries: updatedQueries,
+        databases: selectedDatabases.filter(id => id !== databaseId) as any,
+        searchQueries: updatedQueries as any,
         uploadedFiles: (data.searchPlan?.uploadedFiles || []).filter(
           (file: any) => file.databaseId !== databaseId
         )
       }
     })
-    
+
     const dbName = availableDatabases.find(db => db.id === databaseId)?.name || databaseId
     toast({
       title: "✅ Base de datos eliminada",
@@ -413,7 +413,7 @@ export function SearchPlanStep() {
       // No permitir seleccionar bases de datos deshabilitadas
       return
     }
-    
+
     setSelectedDatabases(prev =>
       prev.includes(dbId) ? prev.filter(id => id !== dbId) : [...prev, dbId]
     )
@@ -464,12 +464,12 @@ export function SearchPlanStep() {
         // Transformar la respuesta del backend
         const formattedQueries = result.queries.map((q: any) => {
           // Buscar el ID correcto desde availableDatabases comparando el nombre
-          const matchedDb = availableDatabases.find(db => 
+          const matchedDb = availableDatabases.find(db =>
             db.name.toLowerCase() === q.database.toLowerCase() ||
             db.id.toLowerCase() === q.database.toLowerCase().replace(/\s+/g, '')
           )
           const dbId = matchedDb?.id || q.database.toLowerCase().replace(/\s+/g, '_')
-          
+
           const formatted = {
             databaseId: dbId,
             databaseName: q.database,
@@ -485,7 +485,7 @@ export function SearchPlanStep() {
           return formatted
         })
         setQueries(formattedQueries)
-        
+
         // También actualizar el wizard context
         updateData({
           searchPlan: {
@@ -493,7 +493,7 @@ export function SearchPlanStep() {
             searchQueries: formattedQueries
           }
         })
-        
+
         toast({
           title: "✅ Cadenas generadas exitosamente",
           description: `${formattedQueries.length} consultas listas para usar`
@@ -540,7 +540,7 @@ export function SearchPlanStep() {
     // Recargar el query original si no se guardó
     const originalQuery = data.searchPlan?.searchQueries?.find(q => q.databaseId === databaseId)
     if (originalQuery) {
-      setQueries(prev => prev.map(q => 
+      setQueries(prev => prev.map(q =>
         q.databaseId === databaseId ? originalQuery : q
       ))
     }
@@ -551,7 +551,7 @@ export function SearchPlanStep() {
     if (currentQuery) {
       // Marcar como editado
       setEditedQueries(prev => new Set(prev).add(databaseId))
-      
+
       // Guardar en el context
       updateData({
         searchPlan: {
@@ -559,13 +559,13 @@ export function SearchPlanStep() {
           searchQueries: queries
         }
       })
-      
+
       toast({
         title: "✅ Cambios guardados",
         description: `Cadena de ${currentQuery.databaseName} actualizada`
       })
     }
-    
+
     // Salir del modo edición
     setEditingQueries(prev => {
       const newSet = new Set(prev)
@@ -576,7 +576,7 @@ export function SearchPlanStep() {
 
   const handleQueryEdit = (databaseId: string, newQuery: string) => {
     // Actualizar el query en el estado local (temporal hasta que se guarde)
-    const updatedQueries = queries.map(q => 
+    const updatedQueries = queries.map(q =>
       q.databaseId === databaseId ? { ...q, query: newQuery } : q
     )
     setQueries(updatedQueries)
@@ -639,55 +639,53 @@ export function SearchPlanStep() {
               {availableDatabases.map((db) => {
                 const isDisabled = disabledDatabases.includes(db.id)
                 const isSelected = selectedDatabases.includes(db.id)
-                
+
                 return (
-                <div 
-                  key={db.id} 
-                  className={`flex flex-col space-y-2 p-3 rounded-lg border-2 transition-colors relative ${
-                    isDisabled 
-                      ? 'border-gray-300 bg-gray-50 opacity-60' 
+                  <div
+                    key={db.id}
+                    className={`flex flex-col space-y-2 p-3 rounded-lg border-2 transition-colors relative ${isDisabled
+                      ? 'border-gray-300 bg-gray-50 opacity-60'
                       : isSelected
-                        ? 'border-primary bg-primary/5 cursor-pointer' 
+                        ? 'border-primary bg-primary/5 cursor-pointer'
                         : 'border-border hover:border-primary/50 cursor-pointer'
-                  }`}
-                  onClick={() => !isDisabled && toggleDatabase(db.id)}
-                  onKeyDown={(e) => e.key === 'Enter' && !isDisabled && toggleDatabase(db.id)}
-                  role="button"
-                  tabIndex={isDisabled ? -1 : 0}
-                >
-                  {/* Badge de estado deshabilitado */}
-                  {isDisabled && (
-                    <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full z-10">
-                      Deshabilitada
-                    </div>
-                  )}
-                  
-                  <div className="flex items-center space-x-3">
-                    <Checkbox
-                      id={db.id}
-                      checked={isSelected && !isDisabled}
-                      disabled={isDisabled}
-                      onCheckedChange={() => !isDisabled && toggleDatabase(db.id)}
-                    />
-                    <label
-                      htmlFor={db.id}
-                      className={`text-sm font-medium leading-none flex items-center gap-2 ${
-                        isDisabled ? 'cursor-not-allowed text-gray-500' : 'cursor-pointer'
                       }`}
-                    >
-                      <span>{db.icon}</span>
-                      <span>{db.name}</span>
-                    </label>
-                  </div>
-                  
-                  {/* Información de acceso premium */}
-                  {db.requiresPremium && (
-                    <div className="ml-8 text-xs text-amber-600 flex items-center gap-1">
-                      <span>🔐</span>
-                      <span>{db.premiumNote}</span>
+                    onClick={() => !isDisabled && toggleDatabase(db.id)}
+                    onKeyDown={(e) => e.key === 'Enter' && !isDisabled && toggleDatabase(db.id)}
+                    role="button"
+                    tabIndex={isDisabled ? -1 : 0}
+                  >
+                    {/* Badge de estado deshabilitado */}
+                    {isDisabled && (
+                      <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full z-10">
+                        Deshabilitada
+                      </div>
+                    )}
+
+                    <div className="flex items-center space-x-3">
+                      <Checkbox
+                        id={db.id}
+                        checked={isSelected && !isDisabled}
+                        disabled={isDisabled}
+                        onCheckedChange={() => !isDisabled && toggleDatabase(db.id)}
+                      />
+                      <label
+                        htmlFor={db.id}
+                        className={`text-sm font-medium leading-none flex items-center gap-2 ${isDisabled ? 'cursor-not-allowed text-gray-500' : 'cursor-pointer'
+                          }`}
+                      >
+                        <span>{db.icon}</span>
+                        <span>{db.name}</span>
+                      </label>
                     </div>
-                  )}
-                </div>
+
+                    {/* Información de acceso premium */}
+                    {db.requiresPremium && (
+                      <div className="ml-8 text-xs text-amber-600 flex items-center gap-1">
+                        <span>🔐</span>
+                        <span>{db.premiumNote}</span>
+                      </div>
+                    )}
+                  </div>
                 )
               })}
             </div>
@@ -726,7 +724,7 @@ export function SearchPlanStep() {
             <Alert className="border-amber-300 dark:border-amber-700">
               <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
               <AlertDescription className="text-foreground">
-                <strong>⚠️ Acción requerida:</strong> Debes cargar las referencias desde al menos una base de datos antes de continuar al siguiente paso.
+                <strong>⚠️ Acción requerida:</strong> Debes cargar las referencias desde TODAS las bases de datos seleccionadas antes de continuar al siguiente paso.
                 <br /><br />
                 <strong>Instrucciones:</strong>
                 <ol className="list-decimal ml-5 mt-2 space-y-1">
@@ -753,174 +751,174 @@ export function SearchPlanStep() {
                     📊 Área: {ACADEMIC_DATABASES[detectedArea]?.name || detectedArea}
                   </Badge>
                 )}
-              {data.searchPlan?.uploadedFiles && data.searchPlan.uploadedFiles.length > 0 && (
-                <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700">
-                  ✓ {data.searchPlan.uploadedFiles.reduce((sum, f) => sum + f.recordCount, 0)} referencias cargadas
-                </Badge>
-              )}
-              <span className="text-sm">Queries optimizadas para cada base de datos académica</span>
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="pt-6">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-[150px]">Base de Datos</TableHead>
-                  <TableHead>Cadena de Búsqueda</TableHead>
-                  <TableHead className="w-[140px] text-center">Búsqueda Avanzada</TableHead>
-                  <TableHead className="w-[120px] text-center">Referencias</TableHead>
-                  <TableHead className="w-[120px]">Acciones</TableHead>
-                  <TableHead className="w-[80px] text-center">Eliminar</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {queries.map((query) => (
-                  <TableRow key={query.databaseId} className="hover:bg-muted/50">
-                    <TableCell className="align-top">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">
-                          {availableDatabases.find(db => db.id === query.databaseId)?.icon || DATABASE_ICONS[query.databaseId] || "📚"}
-                        </span>
-                        <div>
-                          <div className="font-semibold">{query.databaseName}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="align-top">
-                      <div className="space-y-2">
+                {data.searchPlan?.uploadedFiles && data.searchPlan.uploadedFiles.length > 0 && (
+                  <Badge variant="outline" className="bg-green-50 border-green-200 text-green-700">
+                    ✓ {data.searchPlan.uploadedFiles.reduce((sum, f) => sum + f.recordCount, 0)} referencias cargadas
+                  </Badge>
+                )}
+                <span className="text-sm">Queries optimizadas para cada base de datos académica</span>
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[150px]">Base de Datos</TableHead>
+                    <TableHead>Cadena de Búsqueda</TableHead>
+                    <TableHead className="w-[140px] text-center">Búsqueda Avanzada</TableHead>
+                    <TableHead className="w-[120px] text-center">Referencias</TableHead>
+                    <TableHead className="w-[120px]">Acciones</TableHead>
+                    <TableHead className="w-[80px] text-center">Eliminar</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {queries.map((query) => (
+                    <TableRow key={query.databaseId} className="hover:bg-muted/50">
+                      <TableCell className="align-top">
                         <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 px-2"
-                            onClick={() => copyToClipboard(query.query)}
-                          >
-                            <Copy className="h-3 w-3 mr-1" />
-                            <span className="text-xs">Copiar</span>
-                          </Button>
-                          
-                          {!editingQueries.has(query.databaseId) ? (
+                          <span className="text-xl">
+                            {availableDatabases.find(db => db.id === query.databaseId)?.icon || DATABASE_ICONS[query.databaseId] || "📚"}
+                          </span>
+                          <div>
+                            <div className="font-semibold">{query.databaseName}</div>
+                          </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
                             <Button
                               variant="ghost"
                               size="sm"
                               className="h-6 px-2"
-                              onClick={() => enableEditMode(query.databaseId)}
+                              onClick={() => copyToClipboard(query.query)}
                             >
-                              <Edit className="h-3 w-3 mr-1" />
-                              <span className="text-xs">Editar</span>
+                              <Copy className="h-3 w-3 mr-1" />
+                              <span className="text-xs">Copiar</span>
                             </Button>
-                          ) : (
-                            <>
+
+                            {!editingQueries.has(query.databaseId) ? (
                               <Button
                                 variant="ghost"
                                 size="sm"
-                                className="h-6 px-2 text-green-600 hover:text-green-700"
-                                onClick={() => saveEditedQuery(query.databaseId)}
+                                className="h-6 px-2"
+                                onClick={() => enableEditMode(query.databaseId)}
                               >
-                                <Check className="h-3 w-3 mr-1" />
-                                <span className="text-xs">Guardar</span>
+                                <Edit className="h-3 w-3 mr-1" />
+                                <span className="text-xs">Editar</span>
                               </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 px-2 text-red-600 hover:text-red-700"
-                                onClick={() => cancelEditMode(query.databaseId)}
-                              >
-                                <X className="h-3 w-3 mr-1" />
-                                <span className="text-xs">Cancelar</span>
-                              </Button>
-                            </>
-                          )}
-                          
-                          {editedQueries.has(query.databaseId) && !editingQueries.has(query.databaseId) && (
-                            <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-700">
-                              ✏️ Editada
-                            </Badge>
-                          )}
-                        </div>
-                        <Textarea
-                          value={query.query}
-                          onChange={(e) => handleQueryEdit(query.databaseId, e.target.value)}
-                          readOnly={!editingQueries.has(query.databaseId)}
-                          rows={4}
-                          className={`text-xs font-mono resize-none ${
-                            editingQueries.has(query.databaseId)
+                            ) : (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-green-600 hover:text-green-700"
+                                  onClick={() => saveEditedQuery(query.databaseId)}
+                                >
+                                  <Check className="h-3 w-3 mr-1" />
+                                  <span className="text-xs">Guardar</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-6 px-2 text-red-600 hover:text-red-700"
+                                  onClick={() => cancelEditMode(query.databaseId)}
+                                >
+                                  <X className="h-3 w-3 mr-1" />
+                                  <span className="text-xs">Cancelar</span>
+                                </Button>
+                              </>
+                            )}
+
+                            {editedQueries.has(query.databaseId) && !editingQueries.has(query.databaseId) && (
+                              <Badge variant="outline" className="text-xs bg-blue-50 border-blue-200 text-blue-700">
+                                ✏️ Editada
+                              </Badge>
+                            )}
+                          </div>
+                          <Textarea
+                            value={query.query}
+                            onChange={(e) => handleQueryEdit(query.databaseId, e.target.value)}
+                            readOnly={!editingQueries.has(query.databaseId)}
+                            rows={4}
+                            className={`text-xs font-mono resize-none ${editingQueries.has(query.databaseId)
                               ? 'bg-background border-primary focus:border-primary ring-2 ring-primary/20'
                               : 'bg-muted/50 border-muted-foreground/20 cursor-default'
-                          }`}
-                          placeholder="Edita la cadena de búsqueda aquí..."
-                        />
-                        {editingQueries.has(query.databaseId) ? (
-                          <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
-                            <AlertCircle className="h-3 w-3" />
-                            Modo edición: modifica el texto y haz clic en "Guardar"
-                          </p>
+                              }`}
+                            placeholder="Edita la cadena de búsqueda aquí..."
+                          />
+                          {editingQueries.has(query.databaseId) ? (
+                            <p className="text-xs text-amber-600 font-medium flex items-center gap-1">
+                              <AlertCircle className="h-3 w-3" />
+                              Modo edición: modifica el texto y haz clic en "Guardar"
+                            </p>
+                          ) : (
+                            <p className="text-xs text-muted-foreground italic">
+                              💡 Haz clic en "Editar" para modificar esta cadena
+                            </p>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="align-top text-center">
+                        {DATABASE_ADVANCED_SEARCH_URLS[query.databaseId] ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(DATABASE_ADVANCED_SEARCH_URLS[query.databaseId], '_blank')}
+                            className="w-full"
+                          >
+                            <Search className="h-3 w-3 mr-1" />
+                            <span className="text-xs">Ir al sitio oficial</span>
+                          </Button>
                         ) : (
-                          <p className="text-xs text-muted-foreground italic">
-                            💡 Haz clic en "Editar" para modificar esta cadena
-                          </p>
+                          <div className="text-xs text-muted-foreground italic">
+                            No disponible
+                          </div>
                         )}
-                      </div>
-                    </TableCell>
-                    <TableCell className="align-top text-center">
-                      {DATABASE_ADVANCED_SEARCH_URLS[query.databaseId] ? (
+                      </TableCell>
+                      <TableCell className="align-top text-center">
+                        {importedCounts[query.databaseId] ? (
+                          <div>
+                            <div className="text-xl font-bold text-blue-600">
+                              {importedCounts[query.databaseId].toLocaleString()}
+                            </div>
+                            <div className="text-xs text-muted-foreground mt-1">importadas</div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground italic">
+                            Pendiente
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="align-top text-center">
+                        <ImportReferencesWrapper
+                          query={query}
+                          data={data}
+                          updateData={updateData}
+                          createTemporaryProjectForImport={createTemporaryProjectForImport}
+                          setImportedCounts={setImportedCounts}
+                          importedCounts={importedCounts}
+                          toast={toast}
+                        />
+                      </TableCell>
+                      <TableCell className="align-top text-center">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => window.open(DATABASE_ADVANCED_SEARCH_URLS[query.databaseId], '_blank')}
-                          className="w-full"
+                          onClick={() => removeDatabaseFromSelection(query.databaseId)}
+                          className="h-8 px-2 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                          title={`Eliminar ${query.databaseName} de la selección`}
                         >
-                          <Search className="h-3 w-3 mr-1" />
-                          <span className="text-xs">Ir al sitio oficial</span>
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          <span className="text-xs">Eliminar</span>
                         </Button>
-                      ) : (
-                        <div className="text-xs text-muted-foreground italic">
-                          No disponible
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="align-top text-center">
-                      {importedCounts[query.databaseId] ? (
-                        <div>
-                          <div className="text-xl font-bold text-blue-600">
-                            {importedCounts[query.databaseId].toLocaleString()}
-                          </div>
-                          <div className="text-xs text-muted-foreground mt-1">importadas</div>
-                        </div>
-                      ) : (
-                        <div className="text-sm text-muted-foreground italic">
-                          Pendiente
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell className="align-top text-center">
-                      <ImportReferencesWrapper
-                        query={query}
-                        data={data}
-                        updateData={updateData}
-                        createTemporaryProjectForImport={createTemporaryProjectForImport}
-                        setImportedCounts={setImportedCounts}
-                        importedCounts={importedCounts}
-                        toast={toast}
-                      />
-                    </TableCell>
-                    <TableCell className="align-top text-center">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeDatabaseFromSelection(query.databaseId)}
-                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                        title={`Eliminar ${query.databaseName} de la selección`}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </>
       )}
 
@@ -960,7 +958,7 @@ export function SearchPlanStep() {
               <CheckCircle2 className="h-4 w-4 mr-2" />
               Mantener mis ediciones
             </AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleConfirmedRegenerate}
               className="bg-amber-600 hover:bg-amber-700"
             >

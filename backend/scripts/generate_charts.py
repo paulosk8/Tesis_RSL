@@ -729,6 +729,18 @@ def draw_keyword_concentration(data, output_path):
     Identifies thematic focus.
     """
     keywords_data = data.get('keywords', {})
+    blacklist = data.get('keyword_blacklist', [])
+    
+    # Default blacklist for common irrelevant words in systematic reviews
+    DEFAULT_BLACKLIST = [
+        'research', 'study', 'analysis', 'system', 'software', 'paper', 'article',
+        'result', 'finding', 'method', 'approach', 'process', 'data', 'performance',
+        'evaluation', 'using', 'based', 'proposed', 'context', 'field', 'review',
+        'literature', 'survey', 'objective', 'conclusion', 'introduction',
+        'table', 'figure', 'n/r', 'unknown', 'null', 'nan'
+    ]
+    
+    combined_blacklist = set([word.lower() for word in DEFAULT_BLACKLIST] + [word.lower() for word in blacklist])
     
     if not keywords_data or len(keywords_data) == 0:
         print("⚠  No keyword data available", file=sys.stderr)
@@ -740,8 +752,19 @@ def draw_keyword_concentration(data, output_path):
         plt.close()
         return
     
-    # Sort and take top
-    sorted_items = sorted(keywords_data.items(), key=lambda x: x[1]) # Ascending for horizontal bar
+    # Filter keywords
+    filtered_keywords = {
+        k: v for k, v in keywords_data.items() 
+        if k.lower() not in combined_blacklist and len(k) > 2
+    }
+    
+    if not filtered_keywords:
+        print("⚠  All keywords filtered out by blacklist", file=sys.stderr)
+        # Fallback to unfiltered if everything is gone, but report it
+        filtered_keywords = keywords_data
+
+    # Sort and take top 15
+    sorted_items = sorted(filtered_keywords.items(), key=lambda x: x[1])[-15:] # Ascending order for barh, top 15
     words = [item[0].capitalize() for item in sorted_items]
     counts = [item[1] for item in sorted_items]
     

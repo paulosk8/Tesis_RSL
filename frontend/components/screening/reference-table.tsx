@@ -105,7 +105,7 @@ export function ReferenceTable({ references, onStatusChange, onDelete, selectedI
                   <TableCell className="text-sm text-muted-foreground max-w-xs">
                     {(() => {
                       if (!reference.authors) return '-'
-                      
+
                       if (Array.isArray(reference.authors)) {
                         const authors = reference.authors.filter(a => a && a.trim())
                         if (authors.length === 0) return '-'
@@ -113,18 +113,18 @@ export function ReferenceTable({ references, onStatusChange, onDelete, selectedI
                         if (authors.length === 2) return authors.join(', ')
                         return `${authors.slice(0, 2).join(', ')} et al.`
                       }
-                      
+
                       if (typeof reference.authors === 'string') {
-                        const authors = reference.authors
+                        const authors = (reference.authors as string)
                           .split(/[;,]/)
-                          .map(a => a.trim())
-                          .filter(a => a)
+                          .map((a: string) => a.trim())
+                          .filter((a: string) => a)
                         if (authors.length === 0) return '-'
                         if (authors.length === 1) return authors[0]
                         if (authors.length === 2) return authors.join(', ')
                         return `${authors.slice(0, 2).join(', ')} et al.`
                       }
-                      
+
                       return String(reference.authors)
                     })()}
                   </TableCell>
@@ -137,15 +137,15 @@ export function ReferenceTable({ references, onStatusChange, onDelete, selectedI
                           {(reference.screeningScore * 100).toFixed(0)}%
                         </span>
                         {reference.aiReasoning && (
-                          <Badge 
-                            variant="outline" 
+                          <Badge
+                            variant="outline"
                             className="text-[10px]"
                           >
                             {reference.aiReasoning.includes('🤖 Embeddings') && reference.aiReasoning.includes('🧠 CHATGPT')
                               ? '🔀 Híbrido'
                               : reference.aiReasoning.includes('🧠 CHATGPT')
-                              ? '🧠 ChatGPT'
-                              : '🤖 Embeddings'}
+                                ? '🧠 ChatGPT'
+                                : '🤖 Embeddings'}
                           </Badge>
                         )}
                       </div>
@@ -157,21 +157,20 @@ export function ReferenceTable({ references, onStatusChange, onDelete, selectedI
                     <div className="flex flex-col gap-1">
                       <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
                       {reference.aiClassification && (
-                        <Badge 
-                          variant="outline" 
-                          className={`text-[10px] ${
-                            reference.aiClassification === 'include'
+                        <Badge
+                          variant="outline"
+                          className={`text-[10px] ${reference.aiClassification === 'include'
                               ? 'border-green-300 dark:border-green-700 text-green-700 dark:text-green-400'
                               : reference.aiClassification === 'exclude'
-                              ? 'border-red-300 dark:border-red-700 text-red-700 dark:text-red-400'
-                              : 'border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400'
-                          }`}
+                                ? 'border-red-300 dark:border-red-700 text-red-700 dark:text-red-400'
+                                : 'border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400'
+                            }`}
                         >
                           {reference.aiClassification === 'include'
                             ? '✅ IA: Incluir'
                             : reference.aiClassification === 'exclude'
-                            ? '❌ IA: Excluir'
-                            : '🤔 IA: Revisar'}
+                              ? '❌ IA: Excluir'
+                              : '🤔 IA: Revisar'}
                         </Badge>
                       )}
                     </div>
