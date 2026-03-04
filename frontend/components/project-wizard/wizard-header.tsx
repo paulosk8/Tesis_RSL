@@ -12,10 +12,10 @@ const stepNames = [
   "Propuesta",
   "PICO + Matriz",
   "Títulos",
-  "Definición",
   "Criterios I/E",
+  "Keywords / Extraer",
   "Búsqueda",
-  "PRISMA y Confirmación"
+  "Finalización"
 ]
 
 export function WizardHeader() {
@@ -44,7 +44,7 @@ export function WizardHeader() {
               </p>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3">
             <ThemeSwitch />
             <Badge variant="outline">

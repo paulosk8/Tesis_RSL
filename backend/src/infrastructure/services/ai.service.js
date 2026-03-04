@@ -32,7 +32,7 @@ class AIService {
    * @param {string} providerOverride - Provider explícito (ignorado)
    * @returns {Promise<string>} Texto generado
    */
-  async generateText(promptOrSystem, contentOrProvider = null, providerOverride = null) {
+  async generateText(promptOrSystem, contentOrProvider = null, providerOverride = null, options = {}) {
     let systemPrompt, userPrompt;
     
     // Detectar modo de uso
@@ -52,7 +52,7 @@ class AIService {
 
     try {
       if (this.gemini) {
-        return await this._generateWithGemini(systemPrompt, userPrompt);
+        return await this._generateWithGemini(systemPrompt, userPrompt, 5, options);
       } else {
         throw new Error('No hay proveedores de IA configurados');
       }
@@ -66,27 +66,35 @@ class AIService {
    * Genera texto con Gemini 2.5 Pro
    * @private
    */
-  async _generateWithGemini(systemPrompt, userPrompt, maxRetries = 5) {
+  async _generateWithGemini(systemPrompt, userPrompt, maxRetries = 5, options = {}) {
     if (!this.gemini) {
       throw new Error('Gemini API key no configurada');
     }
 
-    // Modelos a intentar en orden de preferencia
-    const modelsToTry = ['gemini-2.5-pro', 'gemini-2.0-flash'];
+    // Modelos a intentar en orden de preferencia (basado en la disponibilidad de la API Key)
+    const modelsToTry = ['gemini-2.5-pro', 'gemini-2.5-flash'];
     let lastError = null;
     let tokensUsed = 0;
+
+    // Configuración de generación
+    const generationConfig = {
+      temperature: options.temperature !== undefined ? options.temperature : 0.3,
+      maxOutputTokens: options.maxOutputTokens || 8192,
+      topP: options.topP,
+      topK: options.topK,
+      responseMimeType: options.responseMimeType
+    };
+
+    console.log(`🧠 [AIService] Config:`, JSON.stringify(generationConfig));
 
     for (const modelName of modelsToTry) {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          console.log(`🤖 [${modelName}] Intento ${attempt}/${maxRetries}...`);
+          console.log(`🤖 [${modelName}] Intento ${attempt}/${maxRetries} (Temp: ${generationConfig.temperature})...`);
           const model = this.gemini.getGenerativeModel({ 
             model: modelName,
             systemInstruction: systemPrompt,
-            generationConfig: {
-              temperature: 0.3,
-              maxOutputTokens: 8192
-            }
+            generationConfig
           });
 
           const result = await model.generateContent(userPrompt);

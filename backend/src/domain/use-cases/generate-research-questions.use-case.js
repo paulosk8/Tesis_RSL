@@ -1,16 +1,8 @@
-/**
- * Use Case: Generate Research Questions (RQs)
- * 
- * Genera de 3 a 4 preguntas de investigación basadas en el marco PICO,
- * siguiendo criterios de multidimensionalidad y rigor académico.
- */
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const AIService = require('../../infrastructure/services/ai.service');
 
 class GenerateResearchQuestionsUseCase {
-  constructor({ geminiApiKey = process.env.GEMINI_API_KEY } = {}) {
-    if (geminiApiKey) {
-      this.gemini = new GoogleGenerativeAI(geminiApiKey);
-    }
+  constructor({ aiService } = {}) {
+    this.aiService = aiService || new AIService();
   }
 
   /**
@@ -18,28 +10,28 @@ class GenerateResearchQuestionsUseCase {
    * @param {Object} params - Datos del proyecto y PICO
    */
   async execute({ projectTitle, projectDescription, researchArea, picoData }) {
-    if (!picoData) {
-      throw new Error('El marco PICO es obligatorio para generar RQs');
+    if (!picoData || !picoData.population || !picoData.intervention) {
+      throw new Error('El marco PICO (Población e Intervención) es obligatorio para generar RQs');
     }
 
-    const model = this.gemini.getGenerativeModel({
-      model: "gemini-1.5-pro",
-      systemInstruction: `Eres un experto en Metodología de la Investigación y Arquitectura de Software. 
-Tus respuestas deben ser técnicas, objetivas y seguir estrictamente los estándares PRISMA 2020 y IEEE.
-Generas Preguntas de Investigación (RQs) que cierran la brecha de conocimiento entre el marco PICO y el análisis técnico.`,
-    });
+    const systemPrompt = `Eres Antigravity, un experto en Metodología de la Investigación y Arquitectura de Software de alta fidelidad.
+Tu objetivo es sintetizar Preguntas de Investigación (RQs) rigurosas basadas EXCLUSIVAMENTE en el marco PICO proporcionado.
+
+REGLAS DE ORO:
+1. Determinismo Total: Usa una temperatura de 0.0. No inventes contextos fuera del PICO.
+2. Anti-AI Style: Evita introducciones genéricas. Usa terminología técnica densa (throughput, overhead, scalability, maintainability, abstraction penalty).
+3. Estándares: Cumple estrictamente con PRISMA 2020 e IEEE.
+4. Voz Activa: Usa "Analizamos", "Evaluamos", "Cuantificamos".`;
 
     const prompt = this._buildPrompt({ projectTitle, projectDescription, researchArea, picoData });
 
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.3,
-        responseMimeType: "application/json",
-      }
+    const responseText = await this.aiService.generateText(systemPrompt, prompt, 'gemini', {
+      temperature: 0.0,
+      topP: 0.1,
+      topK: 1,
+      responseMimeType: "application/json"
     });
 
-    const responseText = result.response.text();
     return this._parseResponse(responseText);
   }
 
@@ -48,36 +40,32 @@ Generas Preguntas de Investigación (RQs) que cierran la brecha de conocimiento 
    */
   _buildPrompt({ projectTitle, projectDescription, researchArea, picoData }) {
     return `
-Genera un bloque de 3 a 4 Preguntas de Investigación (RQs) para la siguiente Revisión Sistemática de Literatura (RSL).
+Genera exactamente 3 Preguntas de Investigación (RQs) multidimensionales para esta Revisión Sistemática (RSL).
 
-DATOS DEL PROYECTO:
+CONTEXTO TÉCNICO:
 - Título: ${projectTitle}
 - Descripción: ${projectDescription}
 - Área: ${researchArea}
 
-MARCO PICO DEFINIDO:
-- P (Población/Contexto Técnico): ${picoData.population || 'No especificada'}
-- I (Intervención/Tecnología): ${picoData.intervention || 'No especificada'}
-- C (Comparación): ${picoData.comparison || 'N/A'}
-- O (Resultados/Outcomes): ${picoData.outcomes || picoData.outcome || 'No especificados'}
+MARCO PICO (Única Fuente de Verdad):
+- P (Población): ${picoData.population}
+- I (Intervención): ${picoData.intervention}
+- C (Comparación): ${picoData.comparison || 'Estado del arte / Alternativas convencionales'}
+- O (Outcomes): ${picoData.outcomes || picoData.outcome}
 
-INSTRUCCIONES DE DISEÑO (OBLIGATORIAS):
-1. Derivación Directa del PICO: Cada RQ debe ser una extensión lógica de los componentes P, I, C y O.
-2. Multidimensionalidad: No generes preguntas binarias (de "sí" o "no"). Las RQs deben cubrir:
-   - Magnitud/Impacto (RQ1): ¿Cuál es el efecto medible de la intervención?
-   - Eficiencia/Comparación (RQ2): ¿Cómo se comporta frente al comparador en recursos/tiempo?
-   - Variables Moderadoras (RQ3/RQ4): ¿Qué factores técnicos influyen en el resultado?
-3. Redacción Académica: Usa verbos como Analizar, Evaluar, Cuantificar, Contrastar. Terminología técnica densa (Anti-AI style).
+REQUERIMIENTOS DE LAS RQS:
+- RQ1 (Impacto/Magnitud): Debe enfocarse en el efecto medible y directo de la Intervención sobre los Outcomes en la Población.
+- RQ2 (Eficiencia/Comparación): Debe contrastar la Intervención frente a la Comparación en términos de recursos técnicos.
+- RQ3 (Factores Moderadores): Debe investigar qué variables técnicas o de entorno influyen en el éxito de la Intervención.
 
-FORMATO DE SALIDA (JSON):
+No generes preguntas de "Sí/No". Cada pregunta debe empezar con "Cómo", "En qué medida" o "Cuál es el impacto".
+
+FORMATO DE SALIDA (JSON ESTRICTO):
 {
   "researchQuestions": [
-    {
-      "id": "RQ1",
-      "question": "Pregunta completa...",
-      "justification": "Breve justificación metodológica de cómo cierra la brecha de conocimiento."
-    },
-    ...
+    "Pregunta 1...",
+    "Pregunta 2...",
+    "Pregunta 3..."
   ]
 }
 `;
@@ -86,13 +74,24 @@ FORMATO DE SALIDA (JSON):
   _parseResponse(text) {
     try {
       let cleanJson = text.trim();
-      if (cleanJson.startsWith('```json')) {
-        cleanJson = cleanJson.replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
-      }
-      return JSON.parse(cleanJson);
+      // Eliminar markdown si existe
+      cleanJson = cleanJson.replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
+      
+      const parsed = JSON.parse(cleanJson);
+      
+      // Asegurar que todas las preguntas sean strings (por si la IA devuelve objetos)
+      const sanitizedRQs = parsed.researchQuestions.map(rq => {
+        if (typeof rq === 'string') return rq;
+        if (typeof rq === 'object' && rq !== null) {
+          return rq.question || rq.text || JSON.stringify(rq);
+        }
+        return String(rq);
+      });
+
+      return { researchQuestions: sanitizedRQs };
     } catch (error) {
-      console.error('Error parseando RQs JSON:', error);
-      throw new Error('La respuesta de la IA no es un JSON válido');
+      console.error('Error parseando RQs JSON:', error, 'Texto original:', text);
+      throw new Error('La respuesta de la IA no pudo ser procesada como el formato de RQs requerido.');
     }
   }
 }

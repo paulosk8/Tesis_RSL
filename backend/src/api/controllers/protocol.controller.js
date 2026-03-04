@@ -1,6 +1,7 @@
 const ProtocolRepository = require('../../infrastructure/repositories/protocol.repository');
 const ProjectRepository = require('../../infrastructure/repositories/project.repository');
 const GenerateResearchQuestionsUseCase = require('../../domain/use-cases/generate-research-questions.use-case');
+const AIService = require('../../infrastructure/services/ai.service');
 
 /**
  * Controlador de protocolos
@@ -130,33 +131,49 @@ class ProtocolController {
         });
       }
 
-      // 2. Obtener protocolo actual
-      const protocol = await this.protocolRepository.findByProjectId(projectId);
+      // 2. Obtener protocolo actual (crear si no existe)
+      let protocol = await this.protocolRepository.findByProjectId(projectId);
       if (!protocol) {
-        return res.status(404).json({
-          success: false,
-          message: 'Protocolo no encontrado. Define el marco PICO primero.'
-        });
+        console.log('⚠️ Protocolo no existe al intentar generar RQs, creándolo para proyecto:', projectId);
+        protocol = await this.protocolRepository.create({ projectId });
       }
 
       // 3. Obtener datos del proyecto para el contexto
       const project = await this.projectRepository.findById(projectId);
 
-      // 4. Ejecutar caso de uso
-      const generateUseCase = new GenerateResearchQuestionsUseCase();
-      const result = await generateUseCase.execute({
-        projectTitle: project.name,
-        projectDescription: project.description,
-        researchArea: protocol.researchArea || project.area,
-        picoData: {
-          population: protocol.population,
-          intervention: protocol.intervention,
-          comparison: protocol.comparison,
-          outcomes: protocol.outcomes
-        }
-      });
+      // 4. Determinar datos PICO (priorizar body para evitar delay de auto-save)
+      const bodyPico = req.body.picoData;
+      const picoData = {
+        population: bodyPico?.population || protocol.population,
+        intervention: bodyPico?.intervention || protocol.intervention,
+        comparison: bodyPico?.comparison || protocol.comparison,
+        outcomes: bodyPico?.outcome || bodyPico?.outcomes || protocol.outcomes
+      };
 
-      // 5. Persistir las RQs generadas
+      console.log('🤖 Preparando generación de RQs con PICO (final):', picoData);
+
+      const aiService = new AIService(userId);
+      const generateUseCase = new GenerateResearchQuestionsUseCase({ aiService });
+      const result = await generateUseCase.execute({
+        projectTitle: project.name || project.title,
+        projectDescription: project.description,
+        researchArea: protocol.researchArea || project.area || project.researchArea,
+        picoData
+      });
+      
+      /*
+      const result = {
+        researchQuestions: [
+          "MOCK Q1: ¿Cómo impacta la herramienta mockeada en el outcome mockeado?",
+          "MOCK Q2: ¿Cuál es el nivel de mantenibilidad comparado con el control?",
+          "MOCK Q3: ¿Qué factores técnicos moderan la escalabilidad del sistema abstracto?"
+        ]
+      }
+      */
+      
+      console.log('✅ RQs generadas por Use Case:', JSON.stringify(result, null, 2));
+
+      // 6. Persistir las RQs generadas
       const updatedProtocol = await this.protocolRepository.update(projectId, {
         researchQuestions: result.researchQuestions
       });

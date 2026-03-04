@@ -8,14 +8,14 @@ export type AIProvider = 'chatgpt' | 'gemini'
 export interface WizardData {
   // Metadata del proyecto (se crea al avanzar al Paso 6)
   projectId?: string
-  
+
   // Paso 1: Propuesta
   projectName: string
   projectDescription: string
   researchArea: string // Nueva: área/disciplina de investigación
   yearStart?: number // Año inicial del rango temporal
   yearEnd?: number // Año final del rango temporal
-  
+
   // Paso 2: PICO + Matriz Es/No Es
   pico: {
     population: string
@@ -33,7 +33,7 @@ export interface WizardData {
     presente: 'si' | 'no' | 'parcial'
     justificacion: string
   }>
-  
+
   // Paso 3: Títulos
   generatedTitles: Array<{
     title: string
@@ -43,7 +43,7 @@ export interface WizardData {
   }>
   selectedTitle: string
   protocolJustification?: string  // Justificación completa del protocolo (4 párrafos integrados)
-  
+
   // Paso 4: Términos del Protocolo (ANTES de criterios)
   protocolTerms?: {
     tecnologia?: string[]
@@ -51,7 +51,7 @@ export interface WizardData {
     tipoEstudio?: string[]
     focosTematicos?: string[]
   }
-  
+
   // Estado de validación de términos (cuáles están confirmados y rechazados)
   confirmedTerms?: {
     tecnologia?: Set<number>
@@ -59,18 +59,18 @@ export interface WizardData {
     tipoEstudio?: Set<number>
     focosTematicos?: Set<number>
   }
-  
+
   discardedTerms?: {
     tecnologia?: Set<number>
     dominio?: Set<number>
     tipoEstudio?: Set<number>
     focosTematicos?: Set<number>
   }
-  
+
   // Paso 5: Criterios I/E (alimentados por términos)
   inclusionCriteria: string[]
   exclusionCriteria: string[]
-  
+
   // Paso 6: Búsqueda (Plan de búsqueda + Estrategia)
   searchPlan: {
     databases: Array<{
@@ -110,14 +110,14 @@ export interface WizardData {
       data: any[]
     }>
   }
-  
+
   protocolDefinition: {
     technologies: string[]
     applicationDomain: string[]
     studyType: string[]
     thematicFocus: string[]
   }
-  
+
   // Paso 7: PRISMA Checklist
   prismaItems: Array<{
     number: number
@@ -126,7 +126,10 @@ export interface WizardData {
     evidence: string
     stage: string // En qué etapa se completa
   }>
-  
+
+  // Paso 3 [NEW]: Research Questions
+  researchQuestions: string[]
+
   // Metadatos
   aiProvider: AIProvider
   lastSaved: Date | null
@@ -190,6 +193,7 @@ const initialData: WizardData = {
     thematicFocus: []
   },
   prismaItems: [],
+  researchQuestions: [],
   aiProvider: 'chatgpt',
   lastSaved: null,
   currentStep: 1
@@ -211,40 +215,38 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
 
   // Función para determinar el paso actual basado en los datos cargados
   const determineCurrentStep = (loadedData: Partial<WizardData>): number => {
-    // Step 7: Si tiene referencias cargadas -> Paso de revisión/finalización (PrismaCheckStep)
-    if (loadedData.searchPlan?.uploadedFiles?.length && loadedData.searchPlan.uploadedFiles.length > 0) {
-      return 7
+    // Step 3 (was 4): Si tiene PICO/Matriz/RQs pero NO tiene título -> Selección de título (PicoMatrixStep completado, ir a TitlesStep)
+    if (((loadedData.pico?.population || loadedData.pico?.intervention ||
+      loadedData.pico?.comparison || loadedData.pico?.outcome) ||
+      (loadedData.matrixIsNot?.is?.length || loadedData.matrixIsNot?.isNot?.length)) &&
+      (!loadedData.selectedTitle || !loadedData.selectedTitle.trim())) {
+      return 3
     }
 
-    // Step 6: Si tiene plan de búsqueda configurado -> Carga de referencias (SearchPlanStep)
-    if (loadedData.searchPlan?.databases?.length && loadedData.searchPlan.databases.length > 0) {
-      return 6
-    }
-
-    // Step 5: Si tiene términos del protocolo definidos -> Plan de búsqueda (ProtocolDefinitionStep)
-    if (loadedData.protocolDefinition && 
-        (loadedData.protocolDefinition.technologies?.length ||
-         loadedData.protocolDefinition.applicationDomain?.length ||
-         loadedData.protocolDefinition.studyType?.length ||
-         loadedData.protocolDefinition.thematicFocus?.length)) {
-      return 5
-    }
-
-    // Step 4: Si tiene criterios definidos -> Definición de términos (CriteriaStep completado, ir a ProtocolDefinitionStep)
-    if (loadedData.inclusionCriteria?.length || loadedData.exclusionCriteria?.length) {
-      return 5
-    }
-
-    // Step 3: Si tiene título seleccionado -> Criterios (TitlesStep completado, ir a CriteriaStep)
-    if (loadedData.selectedTitle && loadedData.selectedTitle.trim()) {
+    // Step 4 (was 5): Si tiene título seleccionado -> Criterios (TitlesStep completado, ir a CriteriaStep)
+    if (loadedData.selectedTitle && loadedData.selectedTitle.trim() && (!loadedData.inclusionCriteria?.length && !loadedData.exclusionCriteria?.length)) {
       return 4
     }
 
-    // Step 2: Si tiene PICO o matriz Es/No Es -> Selección de título (PicoMatrixStep completado, ir a TitlesStep)
-    if ((loadedData.pico?.population || loadedData.pico?.intervention || 
-         loadedData.pico?.comparison || loadedData.pico?.outcome) ||
-        (loadedData.matrixIsNot?.is?.length || loadedData.matrixIsNot?.isNot?.length)) {
-      return 3
+    // Step 5 (was 6): Si tiene criterios definidos -> Definición de términos (CriteriaStep completado, ir a ProtocolDefinitionStep)
+    if ((loadedData.inclusionCriteria?.length || loadedData.exclusionCriteria?.length) &&
+      (!loadedData.protocolDefinition?.technologies?.length && !loadedData.protocolDefinition?.applicationDomain?.length)) {
+      return 5
+    }
+
+    // Step 6 (was 7): Si tiene términos del protocolo definidos -> Carga de referencias (ProtocolDefinitionStep completado, ir a SearchPlanStep)
+    if (loadedData.protocolDefinition &&
+      (loadedData.protocolDefinition.technologies?.length ||
+        loadedData.protocolDefinition.applicationDomain?.length ||
+        loadedData.protocolDefinition.studyType?.length ||
+        loadedData.protocolDefinition.thematicFocus?.length) &&
+      (!loadedData.searchPlan?.uploadedFiles?.length)) {
+      return 6
+    }
+
+    // Step 7 (was 8): Si tiene referencias cargadas -> Paso de revisión/finalización (PrismaCheckStep)
+    if (loadedData.searchPlan?.uploadedFiles?.length && loadedData.searchPlan.uploadedFiles.length > 0) {
+      return 7
     }
 
     // Step 1: Si tiene información básica del proyecto -> Continuar desde tema (ProposalStep completado, ir a PicoMatrixStep)
@@ -266,16 +268,16 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
           if (draft) {
             const parsed = JSON.parse(draft)
             const ageMinutes = (Date.now() - new Date(parsed.timestamp).getTime()) / 60000
-            
+
             // Aumentar tiempo de vida del borrador de 24h a 7 días
             if (ageMinutes < 10080) { // 7 días en minutos
-              setData(prev => ({ 
-                ...prev, 
+              setData(prev => ({
+                ...prev,
                 ...parsed.data,
-                lastSaved: new Date(parsed.timestamp) 
+                lastSaved: new Date(parsed.timestamp)
               }))
               setCurrentStep(parsed.currentStep || determineCurrentStep(parsed.data))
-              
+
               // Si el borrador tiene projectId, cargar también del servidor
               if (parsed.data.projectId) {
                 try {
@@ -295,11 +297,11 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
           console.error('Error cargando borrador local:', error)
           localStorage.removeItem('wizard-draft') // Limpiar borrador corrupto
         }
-        
+
         setIsLoading(false)
         return
       }
-      
+
       try {
         // Si no se pasó projectData, cargar los datos del proyecto primero
         let projectInfo = projectData
@@ -315,7 +317,7 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
             console.error('Error cargando datos del proyecto:', err)
           }
         }
-        
+
         const protocol = await apiClient.getProtocol(projectId)
         // Cargar referencias existentes del proyecto
         let uploadedFiles: any[] = []
@@ -332,7 +334,7 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
               if (!dbGroups[source]) dbGroups[source] = []
               dbGroups[source].push(ref)
             })
-            
+
             // Mapeo inverso de nombre a ID de base de datos
             const NAME_TO_ID: Record<string, string> = {
               'IEEE Xplore': 'ieee',
@@ -345,7 +347,7 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
               'arXiv': 'arxiv',
               'Google Scholar': 'google-scholar'
             }
-            
+
             // Convertir a formato uploadedFiles (compatible con step 6 y step 7)
             uploadedFiles = Object.entries(dbGroups).map(([dbName, refs]) => ({
               name: `${dbName}_export.bib`,
@@ -360,16 +362,17 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
         } catch (err) {
           console.error('Error cargando referencias:', err)
         }
-        
+
         if (protocol) {
           // Mapear datos del protocolo al formato del wizard
           const loadedData: Partial<WizardData> = {
             projectId: projectId,
             projectName: projectInfo?.title || "",
             projectDescription: protocol.refinedQuestion || projectInfo?.description || "",
+            researchQuestions: protocol.researchQuestions || [],
             // Cargar researchArea del protocolo si existe, o del proyecto como fallback
             researchArea: protocol.researchArea || projectInfo?.researchArea || "",
-            
+
             // PICO - el backend puede devolverlo en picoFramework o campos directos
             pico: {
               population: protocol.picoFramework?.population || protocol.population || "",
@@ -377,16 +380,16 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
               comparison: protocol.picoFramework?.comparison || protocol.comparison || "",
               outcome: protocol.picoFramework?.outcomes || protocol.outcomes || ""
             },
-            
+
             // Matriz Es/No Es
             matrixIsNot: {
               is: protocol.isMatrix || [],
               isNot: protocol.isNotMatrix || []
             },
-            
+
             // Título seleccionado
             selectedTitle: protocol.proposedTitle || projectInfo?.title || "",
-            
+
             // Términos del protocolo (formato wizard-internal)
             // Mapear keyTerms del protocolo al formato protocolTerms del wizard
             protocolTerms: {
@@ -395,7 +398,7 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
               tipoEstudio: protocol.keyTerms?.studyType || [],
               focosTematicos: protocol.keyTerms?.themes || []
             },
-            
+
             // Términos confirmados (asumimos todos confirmados al cargar desde servidor)
             confirmedTerms: {
               tecnologia: new Set((protocol.keyTerms?.technology || []).map((_: any, i: number) => i)),
@@ -403,7 +406,7 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
               tipoEstudio: new Set((protocol.keyTerms?.studyType || []).map((_: any, i: number) => i)),
               focosTematicos: new Set((protocol.keyTerms?.themes || []).map((_: any, i: number) => i))
             },
-            
+
             // Sin términos descartados al cargar desde servidor
             discardedTerms: {
               tecnologia: new Set<number>(),
@@ -411,7 +414,7 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
               tipoEstudio: new Set<number>(),
               focosTematicos: new Set<number>()
             },
-            
+
             // Términos del protocolo (formato legacy para paso 7)
             // Mapear keyTerms a estructura esperada por protocolDefinition
             protocolDefinition: {
@@ -420,11 +423,11 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
               studyType: protocol.keyTerms?.studyType || [],
               thematicFocus: protocol.keyTerms?.themes || []
             },
-            
+
             // Criterios
             inclusionCriteria: protocol.inclusionCriteria || [],
             exclusionCriteria: protocol.exclusionCriteria || [],
-            
+
             // Plan de búsqueda
             searchPlan: {
               databases: (protocol.searchStrategy?.searchQueries || protocol.searchQueries || []).map((q: any) => ({
@@ -443,22 +446,22 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
               searchQueries: protocol.searchStrategy?.searchQueries || protocol.searchQueries || [],
               uploadedFiles: uploadedFiles // Referencias cargadas del proyecto
             },
-            
+
             // Rango temporal - cargar desde searchStrategy
             yearStart: protocol.searchStrategy?.temporalRange?.start || 2019,
             yearEnd: protocol.searchStrategy?.temporalRange?.end || new Date().getFullYear(),
-            
+
             // PRISMA - ahora se carga desde API /api/projects/:id/prisma
             prismaItems: []
             // prismaCompliance deprecado - usar endpoint /prisma
           }
-          
+
           setData(prev => ({ ...prev, ...loadedData }))
-          
+
           // Determinar el paso actual basado en qué información está disponible
           const determinedStep = determineCurrentStep(loadedData)
           setCurrentStep(determinedStep)
-          
+
           // Marcar como inicializado para permitir auto-guardado
           setIsInitialized(true)
         }
@@ -468,21 +471,21 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
         setIsLoading(false)
       }
     }
-    
+
     loadExistingProtocol()
   }, [projectId, projectData])
 
   // Limpieza de proyectos temporales cuando el usuario abandona el wizard
   useEffect(() => {
     const cleanupTemporaryProject = async () => {
-      // Solo limpiar si es un proyecto temporal (creado en step 6 pero no completado en step 7)
-      if (data.projectId && currentStep < 7) {
+      // Solo limpiar si es un proyecto temporal (creado en step 5/6 pero no completado en step 6/7)
+      if (data.projectId && currentStep < 6) {
         try {
           // Verificar si el proyecto es temporal
           const projectDetails = await apiClient.getProject(data.projectId)
-          
-          if (projectDetails?.data?.project?.status === 'temporary' || 
-              projectDetails?.data?.project?.title?.startsWith('[TEMPORAL]')) {
+
+          if (projectDetails?.data?.project?.status === 'temporary' ||
+            projectDetails?.data?.project?.title?.startsWith('[TEMPORAL]')) {
             await apiClient.deleteProject(data.projectId)
           }
         } catch (error) {
@@ -495,13 +498,13 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
     // Manejador para cuando el usuario cierra la pestaña o navega fuera
     const handleBeforeUnload = () => {
       // Solo marcar para limpieza si hay proyecto temporal
-      if (data.projectId && currentStep < 7) {
+      if (data.projectId && currentStep < 6) {
         // Usar navigator.sendBeacon para envío asíncrono que no bloquee
-        const payload = JSON.stringify({ 
-          projectId: data.projectId, 
-          action: 'cleanup-temporary' 
+        const payload = JSON.stringify({
+          projectId: data.projectId,
+          action: 'cleanup-temporary'
         })
-        
+
         try {
           navigator.sendBeacon('/api/projects/cleanup-temporary-project', payload)
         } catch (error) {
@@ -512,18 +515,18 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
 
     // Agregar event listener para detección de abandono
     window.addEventListener('beforeunload', handleBeforeUnload)
-    
+
     // Limpiar proyecto temporal cuando el componente se desmonte
     // (usuario navega fuera del wizard sin completar)
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload)
-      
+
       // Limpiar timeout de auto-guardado pendiente
       if (saveTimeoutId) {
         clearTimeout(saveTimeoutId)
       }
-      
-      if (data.projectId && currentStep < 7) {
+
+      if (data.projectId && currentStep < 6) {
         // Ejecutar limpieza de forma asíncrona
         cleanupTemporaryProject()
       }
@@ -533,7 +536,7 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
   const updateData = (updates: Partial<WizardData>) => {
     setData(prev => {
       const newData = { ...prev, ...updates, lastSaved: new Date() }
-      
+
       // Auto-guardar en localStorage (backup local MEJORADO)
       try {
         const key = projectId || 'wizard-draft'
@@ -547,7 +550,7 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
       } catch (error) {
         console.error('Error guardando en localStorage:', error)
       }
-      
+
       // Auto-guardar en backend MEJORADO con debouncing más agresivo
       // Solo auto-guardar si ya está inicializado (no durante carga de draft)
       if (newData.projectId && isInitialized) {
@@ -555,13 +558,13 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
         if (saveTimeoutId) {
           clearTimeout(saveTimeoutId)
         }
-        
+
         // Programar nuevo guardado con menos delay para mejor UX
         const timeoutId = setTimeout(async () => {
           try {
             // Construir datos del protocolo incremental
             const protocolUpdates: any = {}
-            
+
             // Solo incluir campos que han cambiado para optimizar
             if (updates.selectedTitle || updates.pico) {
               protocolUpdates.proposedTitle = newData.selectedTitle
@@ -570,17 +573,17 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
               protocolUpdates.comparison = newData.pico?.comparison
               protocolUpdates.outcomes = newData.pico?.outcome
             }
-            
+
             if (updates.inclusionCriteria || updates.exclusionCriteria) {
               protocolUpdates.inclusionCriteria = newData.inclusionCriteria
               protocolUpdates.exclusionCriteria = newData.exclusionCriteria
             }
-            
+
             if (updates.searchPlan) {
               protocolUpdates.searchQueries = newData.searchPlan?.searchQueries || []
               protocolUpdates.searchString = newData.searchPlan?.searchQueries?.[0]?.query || ''
             }
-            
+
             // Soportar ambas estructuras: protocolDefinition (preferido) y protocolTerms (legacy)
             if (updates.protocolDefinition || updates.protocolTerms) {
               protocolUpdates.keyTerms = {
@@ -590,36 +593,45 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
                 themes: newData.protocolDefinition?.thematicFocus || newData.protocolTerms?.focosTematicos || []
               }
             }
-            
+
             // Guardar researchArea si ha cambiado
             if (updates.researchArea) {
               protocolUpdates.researchArea = newData.researchArea
             }
-            
+
             // Guardar protocolo (createOrUpdate)
-            await apiClient.updateProtocol(newData.projectId, {
-              ...protocolUpdates,
-              lastSaved: new Date().toISOString()
-            })
+            if (newData.projectId) {
+              const protocolPayload: any = {
+                ...protocolUpdates,
+                lastSaved: new Date().toISOString()
+              };
+
+              // Evitar sobreescribir preguntas existentes con arrays vacíos accidentales
+              if (updates.researchQuestions !== undefined || (newData.researchQuestions && newData.researchQuestions.length > 0)) {
+                protocolPayload.researchQuestions = newData.researchQuestions;
+              }
+
+              await apiClient.updateProtocol(newData.projectId, protocolPayload);
+            }
             // También actualizar datos básicos del proyecto si han cambiado
-            if (updates.selectedTitle || updates.projectDescription || updates.researchArea) {
+            if (newData.projectId && (updates.selectedTitle || updates.projectDescription || updates.researchArea)) {
               await apiClient.updateProject(newData.projectId, {
                 title: newData.selectedTitle,
                 description: newData.projectDescription,
                 researchArea: newData.researchArea,
-                status: 'draft' // Mantener como borrador hasta step 7
+                status: 'draft' // Mantener como borrador hasta el final
               })
             }
-            
+
           } catch (error) {
             console.error('❌ Error en auto-guardado:', error)
             // No mostrar error al usuario para no interrumpir el flujo
           }
         }, 1000) // Reducido de 2000ms a 1000ms para guardado más frecuente
-        
+
         setSaveTimeoutId(timeoutId)
       }
-      
+
       return newData
     })
   }
@@ -627,7 +639,7 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
   const resetData = () => {
     setData(initialData)
     setCurrentStep(1)
-    
+
     // Limpiar también localStorage
     try {
       localStorage.removeItem('wizard-draft')
@@ -639,12 +651,13 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
   // Función para limpiar datos generados después de un paso específico
   const clearDataAfterStep = async (targetStep: number) => {
     const updates: Partial<WizardData> = {}
-    
+
     // Paso 1: Propuesta - limpiar todo lo posterior
     if (targetStep === 1) {
       updates.pico = { population: "", intervention: "", comparison: "", outcome: "" }
       updates.matrixIsNot = { is: [], isNot: [] }
       updates.matrixTable = []
+      updates.researchQuestions = []
       updates.generatedTitles = []
       updates.selectedTitle = ""
       updates.protocolJustification = ""
@@ -661,8 +674,8 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
       }
       updates.prismaItems = []
     }
-    
-    // Paso 2: PICO + Matriz - limpiar títulos y todo lo posterior
+
+    // Paso 2: PICO + Matriz + RQs - limpiar títulos y todo lo posterior
     if (targetStep === 2) {
       updates.generatedTitles = []
       updates.selectedTitle = ""
@@ -680,8 +693,8 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
       }
       updates.prismaItems = []
     }
-    
-    // Paso 3: Títulos - limpiar definición del protocolo y criterios
+
+    // Paso 3: Títulos - limpiar criterios y todo lo posterior
     if (targetStep === 3) {
       updates.protocolTerms = { tecnologia: [], dominio: [], tipoEstudio: [], focosTematicos: [] }
       updates.confirmedTerms = { tecnologia: new Set(), dominio: new Set(), tipoEstudio: new Set(), focosTematicos: new Set() }
@@ -696,11 +709,12 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
       }
       updates.prismaItems = []
     }
-    
-    // Paso 4: Definición - limpiar criterios I/E
+
+    // Paso 4: Criterios - limpiar definición del protocolo y plan de búsqueda
     if (targetStep === 4) {
-      updates.inclusionCriteria = []
-      updates.exclusionCriteria = []
+      updates.protocolTerms = { tecnologia: [], dominio: [], tipoEstudio: [], focosTematicos: [] }
+      updates.confirmedTerms = { tecnologia: new Set(), dominio: new Set(), tipoEstudio: new Set(), focosTematicos: new Set() }
+      updates.discardedTerms = { tecnologia: new Set(), dominio: new Set(), tipoEstudio: new Set(), focosTematicos: new Set() }
       updates.searchPlan = {
         databases: [],
         temporalRange: { start: 2019, end: new Date().getFullYear() },
@@ -709,8 +723,8 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
       }
       updates.prismaItems = []
     }
-    
-    // Paso 5: Criterios I/E - limpiar plan de búsqueda
+
+    // Paso 5: Definición - limpiar plan de búsqueda
     if (targetStep === 5) {
       updates.searchPlan = {
         databases: [],
@@ -720,15 +734,15 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
       }
       updates.prismaItems = []
     }
-    
-    // Paso 6: Búsqueda - limpiar PRISMA
+
+    // Paso 6: Plan de búsqueda - limpiar PRISMA
     if (targetStep === 6) {
       updates.prismaItems = []
     }
-    
+
     // Actualizar el estado local
     setData(prev => ({ ...prev, ...updates, lastSaved: new Date() }))
-    
+
     // Si hay un projectId, actualizar también en el backend INMEDIATAMENTE
     if (data.projectId) {
       try {
@@ -736,7 +750,7 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
         const protocolUpdates: any = {
           lastSaved: new Date().toISOString()
         }
-        
+
         // Mapear campos wizard -> backend
         if ('protocolTerms' in updates) {
           protocolUpdates.keyTerms = {
@@ -746,21 +760,21 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
             themes: updates.protocolTerms?.focosTematicos || []
           }
         }
-        
+
         if ('inclusionCriteria' in updates) {
           protocolUpdates.inclusionCriteria = updates.inclusionCriteria || []
         }
-        
+
         if ('exclusionCriteria' in updates) {
           protocolUpdates.exclusionCriteria = updates.exclusionCriteria || []
         }
-        
+
         if ('searchPlan' in updates) {
           protocolUpdates.databases = updates.searchPlan?.databases || []
           protocolUpdates.searchQueries = updates.searchPlan?.searchQueries || []
           protocolUpdates.temporalRange = updates.searchPlan?.temporalRange
         }
-        
+
         // Forzar guardado inmediato (sin debouncing) para cambios estructurales
         await apiClient.updateProtocol(data.projectId, protocolUpdates)
       } catch (error) {
@@ -768,7 +782,7 @@ export function WizardProvider({ children, projectId, projectData }: WizardProvi
         // Mantener cambios locales aunque falle el servidor
       }
     }
-    
+
     // También limpiar localStorage para reflejar el nuevo estado
     try {
       const key = data.projectId || 'wizard-draft'
