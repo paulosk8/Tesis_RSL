@@ -175,11 +175,11 @@ MARCO PICO (ya definido y editado por el investigador):
 - C (Comparación): ${picoData?.comparison || 'N/A'}
 - O (Outcomes): ${picoOutcome}
 
-TÉRMINOS DEL PROTOCOLO (ya confirmados por el investigador - USAR SOLO ESTOS):
-- Tecnologías: ${technologies.length ? technologies.join(' | ') : 'No especificado'}
-- Dominio: ${domains.length ? domains.join(' | ') : 'No especificado'}
-- Focos Temáticos: ${themes.length ? themes.join(' | ') : 'No especificado'}
-${rejectedTerms && rejectedTerms.length > 0 ? '\nLos términos CONFIRMADOS arriba son los ÚNICOS que debes usar. NO agregar términos rechazados.\n' : ''}
+TÉRMINOS ADICIONALES (si existen, priorizarlos):
+- Tecnologías: ${technologies.length ? technologies.join(' | ') : 'Basarse en Intervención (I)'}
+- Dominio: ${domains.length ? domains.join(' | ') : 'Basarse en Población (P)'}
+- Focos Temáticos: ${themes.length ? themes.join(' | ') : 'Basarse en Outcomes (O)'}
+${rejectedTerms && rejectedTerms.length > 0 ? '\nIgnorar los términos rechazados mencionados arriba.\n' : ''}
 RANGO TEMPORAL: ${yearStart || 2019} - ${yearEnd || 2025}
 
 ═══════════════════════════════════════════════════════════════
@@ -193,12 +193,12 @@ Genera 6 filas de criterios alineados con la estrategia de búsqueda:
    - Exclusión: ¡CRÍTICO! Excluir estudios donde [I] aparece fuera del [Dominio] (Ej: Mongoose en Zoología vs API). Resolver Ambigüedad de Contexto.
 
 2. ENFOQUE DE LA SOLUCIÓN (Tecnologías):
-   - Inclusión: [I] y sus sinónimos/variantes validadas.
-   - Exclusión: Tecnologías similares pero no equivalentes.
+   - Inclusión: [I] y sus sinónimos/variantes.
+   - Exclusión: Tecnologías similares pero no equivalentes, o que el investigador haya rechazado.
 
 3. FOCO DE LOS RESULTADOS (Outcomes):
-   - Inclusión: Estudios que evalúen [Focos Temáticos] (incluyendo Umbrella Terms y Causas Raíz como 'Overhead', 'Abstracción', 'Trade-offs').
-   - Exclusión: Estudios puramente descriptivos sin evaluación de métricas de interés.
+   - Inclusión: Estudios que evalúen empíricamente los [Outcomes] (incluyendo Umbrella Terms e indicadores como 'Overhead', 'Abstracción', 'Trade-offs').
+   - Exclusión: Estudios puramente descriptivos sin evaluación de métricas de interés vinculadas a los [Outcomes].
 
 4. TIPO DE ESTUDIO: Inclusión=empíricos/experimentales. Exclusión=opiniones/tutoriales sin validación.
 5. TIPO DE DOCUMENTO: Inclusión=journals/conferencias peer-reviewed. Exclusión=blogs/white papers.
@@ -248,10 +248,10 @@ MARCO PICO (ya validado):
 - C: ${picoData?.comparison || 'N/A'}
 - O: ${picoOutcome}
 
-TÉRMINOS DEL PROTOCOLO CONFIRMADOS (USAR SOLO ESTOS):
-- Tecnología: ${technologies.join(', ')}
-- Dominio: ${domains.join(', ')}
-- Focos: ${themes.join(', ')}
+TÉRMINOS ADICIONALES (si existen, usarlos; si no, basarse en PICO):
+- Tecnología: ${technologies.length ? technologies.join(', ') : 'Usar PICO-I'}
+- Dominio: ${domains.length ? domains.join(', ') : 'Usar PICO-P'}
+- Focos: ${themes.length ? themes.join(', ') : 'Usar PICO-O'}
 
 ENFOQUE PERSONALIZADO: "${customFocus}"
 
@@ -278,11 +278,11 @@ ${rejectedTerms && rejectedTerms.length > 0 ? `TÉRMINOS PROHIBIDOS - NO MENCION
 ${rejectedTerms.map(t => `- ${t}`).join(', ')}
 Usar SOLO los términos confirmados abajo. NO derivar términos prohibidos del título o PICO.
 
-` : ''}CONTEXTO DEL PROTOCOLO (USAR SOLO ESTOS TÉRMINOS CONFIRMADOS):
+` : ''}CONTEXTO DEL PROTOCOLO (Priorizar términos si existen, o basarse en PICO):
 - Título RSL: "${title}"
-- Tecnología central: ${technologies.join(', ')}
-- Dominio/Contexto: ${domains.join(', ')}
-- Focos temáticos: ${themes.join(', ')}
+- Tecnología central: ${technologies.length ? technologies.join(', ') : 'Usar PICO-I'}
+- Dominio/Contexto: ${domains.length ? domains.join(', ') : 'Usar PICO-P'}
+- Focos temáticos: ${themes.length ? themes.join(', ') : 'Usar PICO-O'}
 - PICO-P (Población): ${picoData?.population || 'N/A'}
 - PICO-I (Intervención): ${picoData?.intervention || 'N/A'}
 - PICO-O (Outcomes): ${picoOutcome}
@@ -352,10 +352,10 @@ ${rejectedTerms && rejectedTerms.length > 0 ? `TÉRMINOS PROHIBIDOS - NO MENCION
 ${rejectedTerms.map(t => `- ${t}`).join(', ')}
 Usar SOLO los términos confirmados abajo. NO derivar términos prohibidos del PICO.
 
-` : ''}CONTEXTO PARA COHERENCIA (USAR SOLO ESTOS TÉRMINOS CONFIRMADOS):
-- Tecnología central: ${technologies.join(', ')}
-- Dominio/Contexto: ${domains.join(', ')}
-- Focos temáticos: ${themes.join(', ')}
+` : ''}CONTEXTO PARA COHERENCIA (Priorizar términos si existen, o basarse en PICO):
+- Tecnología central: ${technologies.length ? technologies.join(', ') : 'Usar PICO-I'}
+- Dominio/Contexto: ${domains.length ? domains.join(', ') : 'Usar PICO-P'}
+- Focos temáticos: ${themes.length ? themes.join(', ') : 'Usar PICO-O'}
 - PICO-I: ${picoData?.intervention || 'N/A'}
 - PICO-P: ${picoData?.population || 'N/A'}
 - PICO-O: ${picoOutcome}
