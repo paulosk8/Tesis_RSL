@@ -941,7 +941,8 @@ class ImportReferencesUseCase {
     
     // Encontrar todas las entradas @TYPE{...}
     // Usar regex que busca desde @ hasta } balanceado
-    const entryPattern = /@(\w+)\s*\{([^@]*?)(?=\n@|\n*$)/gs;
+    // FIX: Lookahead (?=\s*@|\s*$) maneja correctamente múltiples saltos de línea (\n\n@)
+    const entryPattern = /@(\w+)\s*\{([^@]*?)(?=\s*@|\s*$)/gs;
     const matches = [...normalizedContent.matchAll(entryPattern)];
     
     console.log(`parseBibTeX: Encontradas ${matches.length} entradas`);

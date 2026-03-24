@@ -109,6 +109,35 @@ export function ProtocolDefinitionStep() {
     })
   }
 
+  const confirmAllTerms = (field: keyof typeof protocolTerms) => {
+    const terms = protocolTerms[field];
+    if (terms.length === 0) return;
+
+    setConfirmedTerms(prev => {
+      const newSet = new Set(prev[field]);
+      terms.forEach((_, index) => newSet.add(index));
+      return { ...prev, [field]: newSet };
+    });
+
+    setDiscardedTerms(prev => {
+      const newSet = new Set(prev[field]);
+      terms.forEach((_, index) => newSet.delete(index));
+      return { ...prev, [field]: newSet };
+    });
+
+    setEditingTerms(prev => {
+      const newSet = new Set(prev[field]);
+      terms.forEach((_, index) => newSet.delete(index));
+      return { ...prev, [field]: newSet };
+    });
+
+    toast({
+      title: "Todo confirmado",
+      description: `Se han confirmado todos los términos de la sección.`,
+      duration: 2000
+    });
+  }
+
   const handleGenerateDefinitions = async () => {
     if (!data.pico.population || !data.pico.intervention) {
       toast({
@@ -445,15 +474,26 @@ export function ProtocolDefinitionStep() {
               <CardTitle>Tecnología / Herramientas</CardTitle>
             </div>
             {protocolTerms.tecnologia.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openRegenerateDialog('tecnologia')}
-                disabled={isRegenerating}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Regenerar
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => confirmAllTerms('tecnologia')}
+                  className="text-green-600 border-green-200 hover:bg-green-50"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Confirmar todos
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openRegenerateDialog('tecnologia')}
+                  disabled={isRegenerating}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Regenerar
+                </Button>
+              </div>
             )}
           </div>
           <CardDescription>
@@ -528,7 +568,7 @@ export function ProtocolDefinitionStep() {
                         onChange={(e) => handleTermChange('tecnologia', index, e.target.value, 'en', esTerm)}
                         placeholder="English Term"
                         rows={2}
-                        disabled={!isEditing || isTranslating || (tech.includes(' - ') && esTerm && enTerm)}
+                        disabled={!isEditing || isTranslating || !!(tech.includes(' - ') && esTerm && enTerm)}
                         className={`${getFieldStyles()} ${(isEditing && tech.includes(' - ') && esTerm && enTerm) ? 'cursor-not-allowed opacity-60' : ''}`}
                         title={(isEditing && tech.includes(' - ') && esTerm && enTerm) ? "Este campo se traduce automáticamente al guardar" : ""}
                       />
@@ -613,15 +653,26 @@ export function ProtocolDefinitionStep() {
               <CardTitle>Dominio de Aplicación</CardTitle>
             </div>
             {protocolTerms.dominio.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openRegenerateDialog('dominio')}
-                disabled={isRegenerating}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Regenerar
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => confirmAllTerms('dominio')}
+                  className="text-green-600 border-green-200 hover:bg-green-50"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Confirmar todos
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openRegenerateDialog('dominio')}
+                  disabled={isRegenerating}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Regenerar
+                </Button>
+              </div>
             )}
           </div>
           <CardDescription>
@@ -696,7 +747,7 @@ export function ProtocolDefinitionStep() {
                         onChange={(e) => handleTermChange('dominio', index, e.target.value, 'en', esTerm)}
                         placeholder="English Term"
                         rows={2}
-                        disabled={!isEditing || isTranslating || (domain.includes(' - ') && esTerm && enTerm)}
+                        disabled={!isEditing || isTranslating || !!(domain.includes(' - ') && esTerm && enTerm)}
                         className={`${getFieldStyles()} ${(isEditing && domain.includes(' - ') && esTerm && enTerm) ? 'cursor-not-allowed opacity-60' : ''}`}
                         title={(isEditing && domain.includes(' - ') && esTerm && enTerm) ? "Este campo se traduce automáticamente al guardar" : ""}
                       />
@@ -781,15 +832,26 @@ export function ProtocolDefinitionStep() {
               <CardTitle>Focos Temáticos</CardTitle>
             </div>
             {protocolTerms.focosTematicos.length > 0 && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => openRegenerateDialog('focosTematicos')}
-                disabled={isRegenerating}
-              >
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Regenerar
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => confirmAllTerms('focosTematicos')}
+                  className="text-green-600 border-green-200 hover:bg-green-50"
+                >
+                  <Check className="h-4 w-4 mr-2" />
+                  Confirmar todos
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => openRegenerateDialog('focosTematicos')}
+                  disabled={isRegenerating}
+                >
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                  Regenerar
+                </Button>
+              </div>
             )}
           </div>
           <CardDescription>
@@ -864,7 +926,7 @@ export function ProtocolDefinitionStep() {
                         onChange={(e) => handleTermChange('focosTematicos', index, e.target.value, 'en', esTerm)}
                         placeholder="English Term"
                         rows={2}
-                        disabled={!isEditing || isTranslating || (focus.includes(' - ') && esTerm && enTerm)}
+                        disabled={!isEditing || isTranslating || !!(focus.includes(' - ') && esTerm && enTerm)}
                         className={`${getFieldStyles()} ${(isEditing && focus.includes(' - ') && esTerm && enTerm) ? 'cursor-not-allowed opacity-60' : ''}`}
                         title={(isEditing && focus.includes(' - ') && esTerm && enTerm) ? "Este campo se traduce automáticamente al guardar" : ""}
                       />

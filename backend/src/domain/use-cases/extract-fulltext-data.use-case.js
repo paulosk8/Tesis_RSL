@@ -95,7 +95,9 @@ Do NOT add any text before or after the JSON. Extract factual information only, 
       // Combinar prompt con el texto a analizar
       const fullPrompt = `${prompt}\n\nTEXT TO ANALYZE:\n${textToAnalyze}`;
       
-      const response = await this.aiService.generateText(fullPrompt);
+      const response = await this.aiService.generateText(fullPrompt, null, null, {
+        temperature: 0.1
+      });
       
       // Limpiar respuesta y parsear JSON
       let cleanedResponse = response.trim();

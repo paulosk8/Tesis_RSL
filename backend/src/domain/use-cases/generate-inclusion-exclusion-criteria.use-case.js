@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const AIService = require('../../infrastructure/services/ai.service');
 
 /**
  * Use Case: Generador de Criterios de Inclusión y Exclusión
@@ -7,17 +7,14 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
  * para ayudar en la selección de estudios en una revisión sistemática.
  */
 class GenerateInclusionExclusionCriteriaUseCase {
-  constructor() {
-    // Inicializar OpenAI/ChatGPT
-    if (process.env.GEMINI_API_KEY) {
-      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    }
+  constructor({ aiService } = {}) {
+    this.aiService = aiService || new AIService();
   }
 
   /**
    * Genera criterios de inclusión y exclusión
    */
-  async execute({ selectedTitle, protocolTerms, picoData, projectTitle, aiProvider = 'chatgpt', specificType, customFocus, categoryIndex, categoryName, yearStart, yearEnd, rejectedTerms }) {
+  async execute({ selectedTitle, protocolTerms, picoData, projectTitle, aiProvider = 'chatgpt', specificType, customFocus, categoryIndex, categoryName, yearStart, yearEnd, rejectedTerms, isFragmented = false }) {
     try {
       // REGLA METODOLÓGICA: Los criterios DEBEN basarse en el título de la RSL seleccionado
       const rslTitle = selectedTitle || projectTitle || 'Proyecto sin título';
@@ -46,20 +43,19 @@ class GenerateInclusionExclusionCriteriaUseCase {
         categoryName, 
         yearStart, 
         yearEnd,
-        rejectedTerms // ← NUEVO: Términos que el investigador rechazó
+        yearEnd,
+        rejectedTerms,
+        isFragmented
       });
       
       let text;
-      if (!this.gemini) {
+      if (!this.aiService) {
         throw new Error('No hay proveedor de IA configurado');
       }
       
-      const model = this.gemini.getGenerativeModel({
-        model: 'gemini-2.5-pro',
-        generationConfig: { temperature: 0.7 }
+      text = await this.aiService.generateText(prompt, null, 'gemini', {
+        temperature: 0.7
       });
-      const result = await model.generateContent(prompt);
-      text = result.response.text();
 
       console.log('Respuesta completa de IA:');
       console.log(text);
@@ -86,7 +82,7 @@ class GenerateInclusionExclusionCriteriaUseCase {
   /**
    * Construye el prompt para la IA
    */
-  buildPrompt({ rslTitle, protocolTerms, picoData, projectTitle, specificType, customFocus, categoryIndex, categoryName, yearStart, yearEnd, rejectedTerms }) {
+  buildPrompt({ rslTitle, protocolTerms, picoData, projectTitle, specificType, customFocus, categoryIndex, categoryName, yearStart, yearEnd, rejectedTerms, isFragmented = false }) {
     // Usar título de la RSL seleccionado como fuente principal
     const title = rslTitle || projectTitle || 'Proyecto sin título';
     
@@ -144,6 +140,16 @@ REGLA DE ORO: Los criterios no son "opuestos". Inclusión = PERTINENCIA. Exclusi
 
 RESPONDE ÚNICAMENTE con la TABLA en formato de texto (sin markdown, sin JSON).
 
+${isFragmented ? `
+ADVERTENCIA DE METODOLOGÍA: MODO FRAGMENTADO (Comparativa Indirecta) ACTIVO
+═══════════════════════════════════════════════════════════════
+Estamos en un protocolo de comparación indirecta. Debido a la escasez de literatura directa:
+- Los criterios de inclusión NO deben exigir la comparación simultánea de [I] y [C] en el mismo estudio.
+- Aceptar estudios que analicen profundamente cualquiera de las dos tecnologías ([I] o [C]) de forma aislada.
+- El objetivo es recolectar piezas de evidencia separadas para una síntesis técnica posterior.
+═══════════════════════════════════════════════════════════════
+
+` : ''}
 ${rejectedTerms && rejectedTerms.length > 0 ? `
 RESTRICCIÓN CRÍTICA - LEER PRIMERO
 ═══════════════════════════════════════════════════════════════

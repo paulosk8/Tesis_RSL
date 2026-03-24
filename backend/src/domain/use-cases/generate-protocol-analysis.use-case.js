@@ -1,12 +1,10 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const AIService = require('../../infrastructure/services/ai.service');
 const Ajv = require('ajv');
 const ajv = new Ajv({ allErrors: true, strict: false });
 
 class GenerateProtocolAnalysisUseCase {
-  constructor({ geminiApiKey = process.env.GEMINI_API_KEY } = {}) {
-    if (geminiApiKey) {
-      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    }
+  constructor({ aiService } = {}) {
+    this.aiService = aiService || new AIService();
     this.outputSchema = {
       type: 'object',
       required: ['titulo_propuesto', 'fase1_marco_pico', 'fase2_matriz_es_no_es'],
@@ -55,29 +53,11 @@ class GenerateProtocolAnalysisUseCase {
   }
 
   normalizeText(text) {
-    if (!text || typeof text !== 'string') return '';
-    let s = text.replace(/[\u201C\u201D\u201E\u201F""]/g, '"').replace(/[\u2018\u2019\u201A\u201B'']/g, "'").replace(/[\u2013\u2014��]/g, '-').replace(/\u2026�/g, '...').replace(/\uFEFF/g, '').replace(/[\u0000-\u001F\u007F-\u009F]/g, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
-    const first = s.indexOf('{');
-    const last = s.lastIndexOf('}');
-    if (first !== -1 && last !== -1 && last > first) s = s.slice(first, last + 1);
-    if (s.startsWith('```json')) s = s.replace(/^```json\n?/, '').replace(/\n?```$/, '');
-    else if (s.startsWith('```')) s = s.replace(/^```\n?/, '').replace(/\n?```$/, '');
-    return s.trim();
+    if (!text || typeof text !== "string") return "";
+    return this.aiService.cleanJson(text);
   }
 
   sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
-
-  async retry(fn, retries = 3, baseMs = 400) {
-    let attempt = 0;
-    while (attempt < retries) {
-      try { return await fn(); }
-      catch (err) {
-        attempt++;
-        if (attempt >= retries) throw err;
-        await this.sleep(baseMs * Math.pow(2, attempt));
-      }
-    }
-  }
 
   /**
    * Construye prompt metodológicamente robusto con reglas PRISMA 2020/Cochrane
@@ -523,20 +503,16 @@ RESPONDE ÚNICAMENTE CON EL JSON VÁLIDO. NO AGREGUES TEXTO ADICIONAL.
   }
 
   async generateWithChatGPT(prompt) {
-    if (!this.gemini) throw new Error('OpenAI no configurado');
-    const res = await this.retry(async () => {
-      const model = this.gemini.getGenerativeModel({
-        model: "gemini-2.5-pro",
-        systemInstruction: 'Eres un experto en metodología PRISMA 2020/Cochrane para revisiones sistemáticas en Ingeniería y Tecnología. REGLAS CRÍTICAS ABSOLUTAS: (1) La POBLACIÓN en RSL de ingeniería es el SISTEMA/ENTORNO TÉCNICO donde se aplica la tecnología, NUNCA "artículos", "estudios" o "publicaciones". (2) Si PICO-C existe, el TÍTULO DEBE incluirlo con formato "I vs C: Impact on O". (3) Usa TÉRMINOS PARAGUAS en títulos (Performance, Efficiency), no métricas individuales. Respondes solo con JSON válido.',
-        generationConfig: {
-          temperature: 0.6,
-          maxOutputTokens: 8192,
-          responseMimeType: "application/json"
-        }
-      });
-      const result = await model.generateContent(prompt);
-      return result.response.text() || '';
-    }, 3, 500);
+    if (!this.aiService) throw new Error('Servicio de IA no configurado');
+    
+    const systemInstruction = 'Eres un experto en metodología PRISMA 2020/Cochrane para revisiones sistemáticas en Ingeniería y Tecnología. REGLAS CRÍTICAS ABSOLUTAS: (1) La POBLACIÓN en RSL de ingeniería es el SISTEMA/ENTORNO TÉCNICO donde se aplica la tecnología, NUNCA "artículos", "estudios" o "publicaciones". (2) Si PICO-C existe, el TÍTULO DEBE incluirlo con formato "I vs C: Impact on O". (3) Usa TÉRMINOS PARAGUAS en títulos (Performance, Efficiency), no métricas individuales. Respondes solo con JSON válido.';
+    
+    const res = await this.aiService.generateText(systemInstruction, prompt, 'gemini', {
+      temperature: 0.1,
+      maxOutputTokens: 8192,
+      responseMimeType: "application/json"
+    });
+    
     return this.normalizeText(res);
   }
 
@@ -594,7 +570,7 @@ RESPONDE ÚNICAMENTE CON EL JSON VÁLIDO. NO AGREGUES TEXTO ADICIONAL.
    */
   async updateMatrizEsNoEs({ marcoPico, area = 'No especificada', yearStart = 2019, yearEnd = new Date().getFullYear() } = {}) {
     if (!marcoPico) throw new Error('Marco PICO requerido para actualizar matriz');
-    if (!this.gemini) throw new Error('No hay proveedor de IA configurado (OpenAI)');
+    if (!this.aiService) throw new Error('No hay proveedor de IA configurado');
     
     console.log('🔄 Actualizando matriz ES/NO ES basada en cambios PICO...');
     console.log('   Área:', area);
@@ -639,7 +615,7 @@ RESPONDE ÚNICAMENTE CON EL JSON VÁLIDO. NO AGREGUES TEXTO ADICIONAL.
    */
   async execute({ title, description, area, yearStart, yearEnd, aiProvider = 'chatgpt' } = {}) {
     if (!title || !description) throw new Error('Titulo y descripcion requeridos');
-    if (!this.gemini) throw new Error('No hay proveedor de IA configurado (OpenAI)');
+    if (!this.aiService) throw new Error('No hay proveedor de IA configurado');
     
     console.log('🔬 Generando análisis de protocolo...');
     console.log('   Proveedor:', aiProvider);

@@ -16,11 +16,12 @@ interface AIScreeningPanelProps {
   totalReferences: number
   pendingReferences: number
   projectId: string
+  isFragmented?: boolean
   onRunScreening: (threshold: number, method: 'embeddings' | 'llm', provider?: 'chatgpt' | 'gemini') => void
   onScreeningComplete?: (resultData?: any) => void // Aceptar datos del resultado
 }
 
-export function AIScreeningPanel({ totalReferences, pendingReferences, projectId, onRunScreening, onScreeningComplete }: AIScreeningPanelProps) {
+export function AIScreeningPanel({ totalReferences, pendingReferences, projectId, isFragmented = false, onRunScreening, onScreeningComplete }: AIScreeningPanelProps) {
   const [method, setMethod] = useState<'embeddings' | 'llm'>('embeddings');
   const [threshold, setThreshold] = useState([0.15]);
   const [recommendedThreshold, setRecommendedThreshold] = useState<number | null>(null);
@@ -70,7 +71,7 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
       // Construir URL del endpoint SSE con token
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
       const token = localStorage.getItem('token');
-      const eventSourceUrl = `${baseUrl}/api/ai/run-project-screening-stream?projectId=${projectId}&threshold=${threshold[0]}&aiProvider=${method === 'llm' ? 'gemini' : 'chatgpt'}&token=${token}`;
+      const eventSourceUrl = `${baseUrl}/api/ai/run-project-screening-stream?projectId=${projectId}&threshold=${threshold[0]}&aiProvider=${method === 'llm' ? 'gemini' : 'chatgpt'}&token=${token}&isFragmented=${isFragmented}`;
 
       // Crear EventSource para SSE
       const eventSource = new EventSource(eventSourceUrl);
@@ -173,6 +174,11 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
           <CardDescription>
             El sistema analiza automáticamente todas las referencias usando similitud semántica
             e inteligencia artificial para clasificarlas en categorías de relevancia según los criterios de tu protocolo.
+            {isFragmented && (
+              <Badge variant="secondary" className="ml-2 bg-amber-100 text-amber-800 border-amber-200">
+                🧩 Modo Fragmentado Activo
+              </Badge>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -213,12 +219,25 @@ export function AIScreeningPanel({ totalReferences, pendingReferences, projectId
             </Button>
           )}
           {pendingReferences === 0 && !isRunning && (
-            <div className="w-full p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-center">
-              <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
-                <CheckCircle2 className="h-5 w-5" />
-                <span className="font-semibold">Cribado completado</span>
+            <div className="space-y-3">
+              <div className="w-full p-3 rounded-lg bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-center">
+                <div className="flex items-center justify-center gap-2 text-green-700 dark:text-green-400">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span className="font-semibold">Cribado completado</span>
+                </div>
+                <p className="text-xs text-green-600 dark:text-green-500 mt-1">Todas las referencias han sido procesadas. Continúe con la Fase 2.</p>
               </div>
-              <p className="text-xs text-green-600 dark:text-green-500 mt-1">Todas las referencias han sido procesadas. Continúe con la Fase 2.</p>
+              
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="w-full text-xs"
+                onClick={handleRunScreening}
+                disabled={isRunning}
+              >
+                <Zap className="h-3 w-3 mr-1" />
+                Reiniciar Cribado (Modo Fragmentado)
+              </Button>
             </div>
           )}
 

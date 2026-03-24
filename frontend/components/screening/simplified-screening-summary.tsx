@@ -106,19 +106,23 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
     }
 
     // Calcular artículos disponibles para selección
-    const allRelevantArticles = [
-        ...(classifiedReferences?.highConfidenceInclude || []),
-        ...(classifiedReferences?.complementaryRelevant || [])
-    ]
+    const allRelevantArticles = useMemo(() => {
+        return [
+            ...(classifiedReferences?.highConfidenceInclude || []),
+            ...(classifiedReferences?.complementaryRelevant || [])
+        ]
+    }, [classifiedReferences])
 
     // Ordenar por score descendente
-    const sortedArticles = [...allRelevantArticles].sort((a, b) => {
-        const scoreA = a.screeningScore || 0
-        const scoreB = b.screeningScore || 0
-        return scoreB - scoreA
-    })
+    const sortedArticles = useMemo(() => {
+        return [...allRelevantArticles].sort((a, b) => {
+            const scoreA = a.screeningScore || 0
+            const scoreB = b.screeningScore || 0
+            return scoreB - scoreA
+        })
+    }, [allRelevantArticles])
 
-    // Calcular punto de codo (elbow) si no viene del backend - optimizado con useMemo
+    // Calcular punto de codo (elbow) si no viene del backend
     const elbowIndex = useMemo(() => {
         if (recommendedCutoff?.articlesToReview) {
             return recommendedCutoff.articlesToReview
@@ -136,18 +140,18 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
         }
 
         const maxDerivativeIndex = derivatives.indexOf(Math.max(...derivatives)) + 1
-        const top10Index = Math.ceil(sortedArticles.length * 0.1)
-        const top50Index = Math.ceil(sortedArticles.length * 0.5)
-
-        if (maxDerivativeIndex < top10Index) return Math.ceil(sortedArticles.length * 0.25)
-        if (maxDerivativeIndex > top50Index) return Math.ceil(sortedArticles.length * 0.25)
-
         return maxDerivativeIndex
     }, [sortedArticles, recommendedCutoff])
 
-    // Usar el Top recomendado por el sistema (punto de codo)
-    const recommendedCount = elbowIndex
-    const recommendedArticles = sortedArticles.slice(0, Math.min(recommendedCount, sortedArticles.length))
+    // Usar el Top recomendado (codo) MÁS cualquier artículo que haya sido incluido manualmente (status === 'included')
+    const recommendedArticles = useMemo(() => {
+        const topN = sortedArticles.slice(0, Math.min(elbowIndex, sortedArticles.length))
+        // Rescatar cualquier artículo incluido que se haya quedado fuera del Top N
+        const manualIncludes = sortedArticles.filter(art => 
+            art.status === 'included' && !topN.some(t => t.id === art.id)
+        )
+        return [...topN, ...manualIncludes]
+    }, [sortedArticles, elbowIndex])
 
     // Obtener artículos seleccionados (todos los recomendados)
     const getSelectedArticles = () => {

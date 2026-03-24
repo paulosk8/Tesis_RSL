@@ -8,30 +8,33 @@ const GenerateProtocolTermsUseCase = require('../../domain/use-cases/generate-pr
 const GenerateInclusionExclusionCriteriaUseCase = require('../../domain/use-cases/generate-inclusion-exclusion-criteria.use-case');
 const RunProjectScreeningUseCase = require('../../domain/use-cases/run-project-screening.use-case');
 const AnalyzeScreeningResultsUseCase = require('../../domain/use-cases/analyze-screening-results.use-case');
+const AIService = require('../../infrastructure/services/ai.service');
 const ReferenceRepository = require('../../infrastructure/repositories/reference.repository');
 const ProtocolRepository = require('../../infrastructure/repositories/protocol.repository');
 const ApiUsageRepository = require('../../infrastructure/repositories/api-usage.repository');
 const { detectResearchArea, getDatabasesByArea } = require('../../config/academic-databases');
 
+const aiService = new AIService();
+
 const referenceRepository = new ReferenceRepository();
 const protocolRepository = new ProtocolRepository();
 const apiUsageRepository = new ApiUsageRepository();
-const generateProtocolAnalysisUseCase = new GenerateProtocolAnalysisUseCase();
-const generateProtocolJustificationUseCase = new GenerateProtocolJustificationUseCase();
-const screenReferencesUseCase = new ScreenReferencesWithAIUseCase();
+const generateProtocolAnalysisUseCase = new GenerateProtocolAnalysisUseCase({ aiService });
+const generateProtocolJustificationUseCase = new GenerateProtocolJustificationUseCase({ aiService });
+const screenReferencesUseCase = new ScreenReferencesWithAIUseCase({ aiService });
 const screenEmbeddingsUseCase = new ScreenReferencesWithEmbeddingsUseCase();
-const generateTitlesUseCase = new GenerateTitlesUseCase();
-const searchQueryGenerator = new SearchQueryGenerator();
-const generateProtocolTermsUseCase = new GenerateProtocolTermsUseCase();
-const generateInclusionExclusionCriteriaUseCase = new GenerateInclusionExclusionCriteriaUseCase();
-const runProjectScreeningUseCase = new RunProjectScreeningUseCase();
+const generateTitlesUseCase = new GenerateTitlesUseCase({ aiService });
+const searchQueryGenerator = new SearchQueryGenerator({ aiService });
+const generateProtocolTermsUseCase = new GenerateProtocolTermsUseCase({ aiService });
+const generateInclusionExclusionCriteriaUseCase = new GenerateInclusionExclusionCriteriaUseCase({ aiService });
+const runProjectScreeningUseCase = new RunProjectScreeningUseCase({ aiService });
 const analyzeScreeningResultsUseCase = new AnalyzeScreeningResultsUseCase({ referenceRepository });
 
 // Helper function para obtener el modelo correcto según el proveedor
 const getModelByProvider = (provider) => {
   const models = {
     'chatgpt': 'gpt-4o-mini',
-    'gemini': 'gemini-2.0-flash-exp'
+    'gemini': 'gemini-1.5-flash' // Actualizado a modelo estable
   };
   return models[provider] || 'gpt-4o-mini';
 };
@@ -304,7 +307,7 @@ const generateTitles = async (req, res) => {
  */
 const generateSearchStrategies = async (req, res) => {
   try {
-    const { matrixData, picoData, databases, researchArea, protocolTerms, yearStart, yearEnd, selectedTitle } = req.body;
+    const { matrixData, picoData, databases, researchArea, protocolTerms, yearStart, yearEnd, selectedTitle, fragmentedMode } = req.body;
 
     // Validaciones
     if (!picoData && !matrixData) {
@@ -327,6 +330,7 @@ const generateSearchStrategies = async (req, res) => {
     console.log('   Términos del protocolo:', Object.keys(protocolTerms || {}).join(', '));
     console.log('   Título RSL:', selectedTitle || 'No especificado');
     console.log('   📅 Rango temporal: yearStart =', yearStart, ', yearEnd =', yearEnd);
+    console.log('   🧩 Modo Fragmentado:', fragmentedMode ? 'Activado' : 'Desactivado');
     
     const result = await searchQueryGenerator.generate({
       databases,
@@ -336,7 +340,8 @@ const generateSearchStrategies = async (req, res) => {
       matrixData: matrixData || {},
       yearStart,
       yearEnd,
-      selectedTitle
+      selectedTitle,
+      fragmentedMode: !!fragmentedMode
     });
 
     // Registrar uso de API (una llamada por cada base de datos)
@@ -609,7 +614,7 @@ const generateProtocolTerms = async (req, res) => {
  */
 const runProjectScreeningEmbeddings = async (req, res) => {
   try {
-    const { projectId, threshold, aiProvider } = req.body;
+    const { projectId, threshold, aiProvider, isFragmented } = req.body;
 
     if (!projectId) {
       return res.status(400).json({
@@ -637,7 +642,8 @@ const runProjectScreeningEmbeddings = async (req, res) => {
       projectId,
       protocol,
       embeddingThreshold: threshold || 0.15, // Umbral más bajo para español/inglés
-      aiProvider: aiProvider || 'chatgpt'
+      aiProvider: aiProvider || 'chatgpt',
+      isFragmented: !!isFragmented
     });
 
     res.status(200).json(result);
@@ -654,7 +660,7 @@ const runProjectScreeningEmbeddings = async (req, res) => {
   // Ejecuta cribado HÍBRIDO con Server-Sent Events para progreso en tiempo real
   const runProjectScreeningStream = async (req, res) => {
     try {
-      const { projectId, threshold, aiProvider, token } = req.query;
+      const { projectId, threshold, aiProvider, token, isFragmented } = req.query;
 
       if (!projectId) {
         return res.status(400).json({
@@ -729,7 +735,8 @@ const runProjectScreeningEmbeddings = async (req, res) => {
           protocol,
           embeddingThreshold: parseFloat(threshold) || 0.15,
           aiProvider: aiProvider || 'gemini', // Forzado Gemini defaults
-          progressCallback // Pasar callback para eventos de progreso
+          progressCallback, // Pasar callback para eventos de progreso
+          isFragmented: isFragmented === 'true' || isFragmented === true
         });
 
         // Enviar resultado final
@@ -766,7 +773,7 @@ const runProjectScreeningEmbeddings = async (req, res) => {
  */
 const runProjectScreeningLLM = async (req, res) => {
   try {
-    const { projectId, llmProvider } = req.body;
+    const { projectId, llmProvider, isFragmented } = req.body;
 
     if (!projectId) {
       return res.status(400).json({
@@ -781,7 +788,8 @@ const runProjectScreeningLLM = async (req, res) => {
 
     const result = await runProjectScreeningUseCase.executeLLM({
       projectId,
-      llmProvider: llmProvider || 'gemini'
+      llmProvider: llmProvider || 'gemini',
+      isFragmented: !!isFragmented
     });
 
     res.status(200).json(result);

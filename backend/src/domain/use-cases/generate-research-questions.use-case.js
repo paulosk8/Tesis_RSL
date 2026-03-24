@@ -73,9 +73,7 @@ FORMATO DE SALIDA (JSON ESTRICTO):
 
   _parseResponse(text) {
     try {
-      let cleanJson = text.trim();
-      // Eliminar markdown si existe
-      cleanJson = cleanJson.replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
+      let cleanJson = this.aiService.cleanJson(text);
       
       const parsed = JSON.parse(cleanJson);
       

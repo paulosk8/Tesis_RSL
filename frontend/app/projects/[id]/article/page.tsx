@@ -11,6 +11,7 @@ import { AIGeneratorPanel } from "@/components/article/ai-generator-panel"
 import { ArticleStats } from "@/components/article/article-stats"
 import { PrismaPreviewDialog } from "@/components/article/prisma-preview-dialog"
 import { ExportPanel } from "@/components/article/export-panel"
+import { JournalTemplatePanel } from "@/components/article/journal-template-panel"
 import type { ArticleVersion } from "@/lib/article-types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -160,7 +161,7 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
       // Cargar versiones guardadas del artículo
       try {
         const versionsData = await apiClient.getArticleVersions(params.id)
-        
+
         if (versionsData.success && versionsData.data && versionsData.data.length > 0) {
           setVersions(versionsData.data)
           setCurrentVersionId(versionsData.data[0].id)
@@ -515,7 +516,7 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
 
       // Generar archivo JSON
       const jsonContent = JSON.stringify(references, null, 2)
-      
+
       // Descargar como archivo .json
       const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8' })
       const url = URL.createObjectURL(blob)
@@ -544,31 +545,31 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
   const parseReferencesToJSON = (referencesText: string): any[] => {
     const references: any[] = []
     let refCounter = 1
-    
+
     // Limpiar markdown y texto adicional
     let cleanText = referencesText
       .replaceAll('**', '') // Quitar negritas
       .replaceAll('*', '') // Quitar asteriscos
       .trim()
-    
+
     // Patrón 1: Referencias numeradas [1] Autor (Año). Título. Fuente.
     // Buscar líneas que empiezan con [número]
     const lines = cleanText.split('\n')
-    
+
     for (const line of lines) {
       const trimmedLine = line.trim()
-      
+
       // Solo procesar líneas que empiezan con [número]
       const startsWithNumber = /^\[\d+\]/.test(trimmedLine)
       if (!startsWithNumber) continue
-      
+
       // Regex más específico para referencias numeradas
       const refRegex = /^\[(\d+)\]\s+(.+?)\s+\((\d{4})\)\.\s+(.+?)(?:\.\s+(.+?))?$/
       const match = refRegex.exec(trimmedLine)
-      
+
       if (match) {
         const [, id, authors, year, title, source] = match
-        
+
         const reference: any = {
           id: `ref${id}`,
           type: "article-journal",
@@ -581,9 +582,9 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
 
         if (source?.trim()) {
           const sourceTrimmed = source.trim()
-          if (sourceTrimmed.toLowerCase().includes('scopus') || 
-              sourceTrimmed.toLowerCase().includes('ieee') || 
-              sourceTrimmed.toLowerCase().includes('wos')) {
+          if (sourceTrimmed.toLowerCase().includes('scopus') ||
+            sourceTrimmed.toLowerCase().includes('ieee') ||
+            sourceTrimmed.toLowerCase().includes('wos')) {
             reference["container-title"] = sourceTrimmed
           } else {
             reference["publisher"] = sourceTrimmed
@@ -598,16 +599,16 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
     // Patrón 2: Referencias metodológicas (PRISMA, etc.)
     // Formato: Autor (Año): Título. [Fuente]. [doi: xxx]
     const methodRefRegex = /^(?!\[)([A-Z][^(]+?)\s+\((\d{4})\)[:.]\s+([^.]+)(?:\.\s+([A-Z][^.]+?))?(?:\s+doi:\s*(.+?))?$/gm
-    
+
     let match
     while ((match = methodRefRegex.exec(cleanText)) !== null) {
       const [, authors, year, title, source, doi] = match
-      
+
       // Evitar duplicados de referencias ya capturadas
-      const isDuplicate = references.some(ref => 
+      const isDuplicate = references.some(ref =>
         ref.title.toLowerCase() === title.trim().toLowerCase()
       )
-      
+
       if (!isDuplicate) {
         const reference: any = {
           id: `ref${refCounter++}`,
@@ -637,7 +638,7 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
   const parseAuthors = (authorsString: string): any[] => {
     // Limpiar asteriscos y espacios extras
     const cleanAuthors = authorsString.replaceAll('*', '').trim()
-    
+
     // Separar por comas, "and", "y", "et al."
     const etAlRegex = /^et\s+al\.?$/i
     // Split por delimitadores comunes: coma, punto y coma, 'and', 'y', 'et al.'
@@ -649,7 +650,7 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
     return authorList.map(author => {
       // Formato: "Apellido, Iniciales" o "Apellido Iniciales"
       const parts = author.split(/\s+/)
-      
+
       // Si tiene formato "Apellido, I.I." 
       if (author.includes(',')) {
         const [family, ...givenParts] = author.split(',').map(p => p.trim())
@@ -658,13 +659,13 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
           given: givenParts.join(' ').replaceAll('.', '. ').trim()
         }
       }
-      
+
       // Si tiene múltiples partes, último es apellido
       if (parts.length >= 2) {
         // Verificar si todas las partes excepto la primera son iniciales
         const initialRegex = /^[A-Z]\.?$/
         const hasInitials = parts.slice(1).every(p => initialRegex.test(p))
-        
+
         if (hasInitials) {
           // Formato: Apellido I. I.
           return {
@@ -679,7 +680,7 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
           }
         }
       }
-      
+
       // Solo un nombre
       return {
         family: author,
@@ -690,9 +691,9 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
 
   const convertMarkdownToLatex = (markdown: string): string => {
     if (!markdown) return ''
-    
+
     let latex = markdown
-    
+
     // PASO 1: Convertir headers PRIMERO (antes de escapar #)
     latex = latex.replaceAll(/^###\s+\d+\.\d+\.\d+\s+(.+)$/gm, String.raw`\subsubsection{$1}`)
     latex = latex.replaceAll(/^###\s+(.+)$/gm, String.raw`\subsubsection{$1}`)
@@ -700,35 +701,35 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
     latex = latex.replaceAll(/^##\s+(.+)$/gm, String.raw`\subsection{$1}`)
     latex = latex.replaceAll(/^#\s+\d+\.\s+(.+)$/gm, String.raw`\section{$1}`)
     latex = latex.replaceAll(/^#\s+(.+)$/gm, String.raw`\section{$1}`)
-    
+
     // PASO 1.5: Eliminar títulos duplicados (líneas en negrita o subsecciones justo después de secciones)
     // Ejemplo: \section{Conclusiones}\n\textbf{Conclusiones} -> \section{Conclusiones}
     latex = latex.replaceAll(/\\(section|subsection|subsubsection)\{([^}]+)\}\s*\n\s*\\textbf\{\2\}/g, String.raw`\$1{$2}`)
     // Eliminar subsecciones duplicadas después de secciones con el mismo nombre
     latex = latex.replaceAll(/\\section\{([^}]+)\}\s*\n\s*\\subsection\{\1\}/g, String.raw`\section{$1}`)
-    
+
     // PASO 2: Detectar y convertir tablas Markdown COMPLETAS
     const tableRegex = /(\|.+\|[\r\n]+)+/g
     latex = latex.replaceAll(tableRegex, (tableMatch) => {
       const rows = tableMatch.trim().split('\n').filter(row => row.trim())
       if (rows.length < 2) return tableMatch
-      
+
       // Detectar separador de headers (|---|---|)
       const headerSepIndex = rows.findIndex(row => /^\|[\s-:|]+\|$/.test(row))
       if (headerSepIndex === -1) return tableMatch // No es tabla válida
-      
+
       const headerRow = rows[headerSepIndex - 1]
       const dataRows = rows.slice(headerSepIndex + 1)
-      
+
       if (!headerRow) return tableMatch
-      
+
       // Extraer headers
       const headers = headerRow.split('|')
         .map(h => h.trim())
         .filter(Boolean)
-      
+
       const numCols = headers.length
-      
+
       // IMPORTANTE: Usar p{width} para columnas con texto largo
       let colSpec = ''
       if (numCols === 2) {
@@ -753,15 +754,15 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
         // Tablas con 8+ columnas: usar columnas centradas compactas
         colSpec = 'c '.repeat(numCols).trim()
       }
-      
+
       // Construir tabla LaTeX con espaciado vertical mejorado
       let latexTable = '\n\\begin{table}[H]\n\\centering\n'
       latexTable += '\\renewcommand{\\arraystretch}{1.2}\n'
       latexTable += `\\begin{tabular}{${colSpec}}\n\\toprule\n`
-      
+
       // Headers
       latexTable += headers.join(' & ') + ' \\\\\n\\midrule\n'
-      
+
       // Data rows
       dataRows.forEach(row => {
         const cells = row.split('|')
@@ -771,32 +772,32 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
           latexTable += cells.join(' & ') + ' \\\\\n'
         }
       })
-      
+
       latexTable += '\\bottomrule\n\\end{tabular}\n\\caption{Tabla}\n\\end{table}\n\n'
       return latexTable
     })
-    
+
     // PASO 3: Convertir imágenes
     latex = latex.replaceAll(/!\[([^\]]*)\]\(([^)]+)\)/g, (match, alt, url) => {
       const imageName = url.split('/').pop() || 'imagen.png'
       return `\n\\begin{figure}[H]\n\\centering\n\\includegraphics[width=0.8\\textwidth]{images/${imageName}}\n\\caption{${alt}}\n\\end{figure}\n\n`
     })
-    
+
     // PASO 4: Convertir listas con viñetas y numeradas
     const lines = latex.split('\n')
     let inItemize = false
     let inEnumerate = false
     const processedLines: string[] = []
-    
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i]
       const nextLine = lines[i + 1] || ''
-      
+
       const bulletRegex = /^[-*]\s+(.+)$/
       const bulletTestRegex = /^[-*]\s+/
       const numberedRegex = /^\d+\.\s+(.+)$/
       const numberedTestRegex = /^\d+\.\s+/
-      
+
       // Lista con viñetas
       if (bulletRegex.test(line)) {
         if (!inItemize) {
@@ -804,7 +805,7 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
           inItemize = true
         }
         processedLines.push(line.replace(bulletRegex, String.raw`  \item $1`))
-        
+
         if (!bulletTestRegex.test(nextLine)) {
           processedLines.push(String.raw`\end{itemize}`)
           inItemize = false
@@ -817,7 +818,7 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
           inEnumerate = true
         }
         processedLines.push(line.replace(numberedRegex, String.raw`  \item $1`))
-        
+
         if (!numberedTestRegex.test(nextLine)) {
           processedLines.push(String.raw`\end{enumerate}`)
           inEnumerate = false
@@ -827,18 +828,18 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
         processedLines.push(line)
       }
     }
-    
+
     latex = processedLines.join('\n')
-    
+
     // PASO 5: Convertir bold y cursiva
     latex = latex.replaceAll(/\*\*(.+?)\*\*/g, String.raw`\textbf{$1}`)
     latex = latex.replaceAll(/\*(.+?)\*/g, String.raw`\textit{$1}`)
-    
+
     // PASO 6: Escapar caracteres especiales (DESPUÉS de todas las conversiones)
     // IMPORTANTE: NO escapar { } porque son parte de la sintaxis LaTeX
     // Solo escapar: & % $ _ ~ ^
     latex = latex.replaceAll(/([&%$_~^])/g, String.raw`\$1`)
-    
+
     return latex
   }
 
@@ -989,16 +990,17 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
             </div>
           </div>
 
-          {/* Panel de Exportación */}
+          {/* Paneles de Salida (Exportación y Formato Personalizado) */}
           {currentVersion && currentVersion.id !== 'v1-temp' && (
-            <div className="mt-6">
-              <ExportPanel 
-                projectId={params.id} 
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <ExportPanel
+                projectId={params.id}
                 canExport={status?.canGenerate || false}
                 blockingReason={status?.blockingReason}
                 onRegenerate={handleGenerateFullArticle}
                 isRegenerating={isGenerating}
               />
+              <JournalTemplatePanel projectId={params.id} />
             </div>
           )}
         </div>

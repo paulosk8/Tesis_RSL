@@ -7,6 +7,9 @@
 const express = require('express');
 const router = express.Router();
 const rqsController = require('../controllers/rqs.controller');
+const { authMiddleware } = require('../../infrastructure/middlewares/auth.middleware');
+
+router.use(authMiddleware);
 
 /**
  * GET /api/projects/:projectId/rqs

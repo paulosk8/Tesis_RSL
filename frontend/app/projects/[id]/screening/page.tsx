@@ -392,7 +392,7 @@ export default function ScreeningPage({ params }: { params: { id: string } }) {
 
     const matchesSearch = searchQuery === "" ||
       ref.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (Array.isArray(ref.authors) ? ref.authors.some((author: any) => author.toLowerCase().includes(searchQuery.toLowerCase())) : (ref.authors || '').toLowerCase().includes(searchQuery.toLowerCase()))
+      (Array.isArray(ref.authors) ? ref.authors.join(' ').toLowerCase().includes(searchQuery.toLowerCase()) : (ref.authors || '').toLowerCase().includes(searchQuery.toLowerCase()))
 
     return matchesStatus && matchesMethod && matchesSearch
   })
@@ -450,25 +450,49 @@ export default function ScreeningPage({ params }: { params: { id: string } }) {
             </TabsList>
 
             <TabsContent value="fase1" className="space-y-6">
-              <AIScreeningPanel totalReferences={stats.total} pendingReferences={stats.pending} projectId={params.id} onRunScreening={handleRunScreening} onScreeningComplete={handleScreeningComplete} />
+              <AIScreeningPanel 
+                totalReferences={stats.total} 
+                pendingReferences={stats.pending} 
+                projectId={params.id} 
+                isFragmented={project?.protocol?.searchPlan?.isFragmentedMode}
+                onRunScreening={handleRunScreening} 
+                onScreeningComplete={handleScreeningComplete} 
+              />
               {lastScreeningResult && (
                 <SimplifiedScreeningSummary
                   projectId={params.id}
                   result={{
                     ...lastScreeningResult,
                     classifiedReferences: {
-                      highConfidenceInclude: references.filter(r => (r as any).screeningScore > 0.15 && !r.aiReasoning?.toLowerCase().includes('chatgpt')),
-                      highConfidenceExclude: references.filter(r => (r as any).screeningScore < 0.10 && !r.aiReasoning?.toLowerCase().includes('chatgpt')),
-                      complementaryRelevant: references.filter(r => r.aiClassification === 'include' && r.aiReasoning?.toLowerCase().includes('chatgpt')),
-                      complementaryNotRelevant: references.filter(r => r.aiClassification === 'exclude' && r.aiReasoning?.toLowerCase().includes('chatgpt'))
+                      highConfidenceInclude: references.filter(r => 
+                        ((r as any).screeningScore > 0.15 && !r.aiReasoning?.toLowerCase().includes('chatgpt')) || 
+                        (r.status === 'included' && !r.aiReasoning?.toLowerCase().includes('chatgpt'))
+                      ),
+                      highConfidenceExclude: references.filter(r => 
+                        ((r as any).screeningScore < 0.10 && !r.aiReasoning?.toLowerCase().includes('chatgpt') && r.status !== 'included')
+                      ),
+                      complementaryRelevant: references.filter(r => 
+                        (r.aiClassification === 'include' || r.status === 'included') && r.aiReasoning?.toLowerCase().includes('chatgpt')
+                      ),
+                      complementaryNotRelevant: references.filter(r => 
+                        r.aiClassification === 'exclude' && r.aiReasoning?.toLowerCase().includes('chatgpt') && r.status !== 'included'
+                      )
                     }
                   }}
+                  onProceedToManualReview={(ids) => handleSelectForFullText(ids, ids.length, 'Fase 1')}
                 />
               )}
               <Card>
                 <CardHeader><CardTitle>Listado de Referencias ({filteredReferences.length})</CardTitle></CardHeader>
                 <CardContent>
-                  <ScreeningFilters statusFilter={statusFilter} setStatusFilter={setStatusFilter} methodFilter={methodFilter} setMethodFilter={setMethodFilter} searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+                  <ScreeningFilters 
+                    statusFilter={statusFilter} 
+                    onStatusFilterChange={setStatusFilter} 
+                    methodFilter={methodFilter} 
+                    onMethodFilterChange={setMethodFilter} 
+                    searchQuery={searchQuery} 
+                    onSearchQueryChange={setSearchQuery} 
+                  />
                   <ReferenceTable references={filteredReferences} onStatusChange={handleStatusChange} onDelete={handleDeleteReference} selectedIds={[]} onSelectionChange={() => { }} showActions={false} enableSelection={false} />
                 </CardContent>
               </Card>

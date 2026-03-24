@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const AIService = require('../../infrastructure/services/ai.service');
 
 /**
  * Use Case: Genera la JUSTIFICACIÓN del protocolo de revisión sistemática
@@ -11,12 +11,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
  * - Párrafo 4: Necesidad de la revisión sistemática
  */
 class GenerateProtocolJustificationUseCase {
-  constructor({ 
-    geminiApiKey = process.env.GEMINI_API_KEY
-  } = {}) {
-    if (geminiApiKey) {
-      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    }
+  constructor({ aiService } = {}) {
+    this.aiService = aiService || new AIService();
   }
 
   /**
@@ -28,8 +24,8 @@ class GenerateProtocolJustificationUseCase {
     console.log(`   Área: ${area}`);
     console.log(`   Rango temporal: ${yearStart} - ${yearEnd}`);
 
-    if (!this.gemini) {
-      throw new Error('Gemini no está configurado');
+    if (!this.aiService) {
+      throw new Error('Servicio de IA no configurado');
     }
 
     try {
@@ -47,20 +43,15 @@ class GenerateProtocolJustificationUseCase {
    */
   async _generateWithChatGPT({ title, description, area, yearStart, yearEnd, pico, matrixData }) {
     const prompt = this._buildPrompt({ title, description, area, yearStart, yearEnd, pico, matrixData });
+    const systemInstruction = 'Eres un experto en metodología PRISMA/Cochrane especializado en redacción de justificaciones académicas para protocolos de revisión sistemática.';
 
-    const model = this.gemini.getGenerativeModel({
-      model: "gemini-2.5-pro",
-      systemInstruction: 'Eres un experto en metodología PRISMA/Cochrane especializado en redacción de justificaciones académicas para protocolos de revisión sistemática.',
-      generationConfig: {
-        temperature: 0.6,
-        maxOutputTokens: 2000,
-        responseMimeType: "application/json"
-      }
+    const text = await this.aiService.generateText(systemInstruction, prompt, 'gemini', {
+      temperature: 0.1,
+      maxOutputTokens: 2000,
+      responseMimeType: "application/json"
     });
 
-    const result = await model.generateContent(prompt);
-    const text = result.response.text().trim();
-    return JSON.parse(text);
+    return JSON.parse(this.aiService.cleanJson(text));
   }
 
   /**

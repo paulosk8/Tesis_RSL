@@ -310,7 +310,8 @@ class ApiClient {
     matrixData?: any,
     yearStart?: number,
     yearEnd?: number,
-    selectedTitle?: string
+    selectedTitle?: string,
+    fragmentedMode?: boolean
   ) {
     const data = await this.request('/api/ai/generate-search-strategies', {
       method: 'POST',
@@ -322,7 +323,8 @@ class ApiClient {
         protocolTerms,
         yearStart,
         yearEnd,
-        selectedTitle
+        selectedTitle,
+        fragmentedMode
       }),
     })
     return data.data
@@ -574,7 +576,7 @@ class ApiClient {
   }
 
   // IA - Screening automático
-  async runScreeningEmbeddings(projectId: string, options: { threshold?: number } = {}) {
+  async runScreeningEmbeddings(projectId: string, options: { threshold?: number, isFragmented?: boolean } = {}) {
     // Timeout extendido para procesos largos (10 minutos)
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 600000) // 10 minutos
@@ -589,7 +591,8 @@ class ApiClient {
         body: JSON.stringify({
           projectId,
           threshold: options.threshold || 0.15,
-          aiProvider: 'chatgpt'
+          aiProvider: 'chatgpt',
+          isFragmented: options.isFragmented || false
         }),
         signal: controller.signal
       })
@@ -612,12 +615,13 @@ class ApiClient {
     }
   }
 
-  async runScreeningLLM(projectId: string, options: { llmProvider?: 'gemini' | 'chatgpt' } = {}) {
+  async runScreeningLLM(projectId: string, options: { llmProvider?: 'gemini' | 'chatgpt', isFragmented?: boolean } = {}) {
     const data = await this.request('/api/ai/run-project-screening-llm', {
       method: 'POST',
       body: JSON.stringify({
         projectId,
-        llmProvider: options.llmProvider || 'gemini'
+        llmProvider: options.llmProvider || 'gemini',
+        isFragmented: options.isFragmented || false
       }),
     })
     return data
@@ -922,6 +926,29 @@ class ApiClient {
       body: JSON.stringify(versionData),
     })
     return data
+  }
+
+  /**
+   * Genera artículo basado en una plantilla de revista (PDF/LaTeX)
+   */
+  async generateArticleFromTemplate(projectId: string, file: File) {
+    const formData = new FormData()
+    formData.append('template', file)
+
+    const response = await fetch(`${this.baseUrl}/api/projects/${projectId}/article/custom-template`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.token}`,
+      },
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.message || 'Error al procesar la plantilla de la revista')
+    }
+
+    return response.json()
   }
 
   // === RQS (Research Question Schema) ENDPOINTS ===

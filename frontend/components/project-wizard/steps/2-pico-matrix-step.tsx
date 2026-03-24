@@ -138,7 +138,7 @@ export function PicoMatrixStep() {
       const result = await apiClient.generateProtocolAnalysis(
         data.projectName,
         data.projectDescription,
-        'chatgpt', // Siempre usar ChatGPT
+        'gemini', // Usar Gemini ya que el modelo pro ha sido conectado
         areaTexto,
         data.yearStart,
         data.yearEnd

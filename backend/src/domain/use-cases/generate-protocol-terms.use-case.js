@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const AIService = require('../../infrastructure/services/ai.service');
 
 /**
  * Use Case: Generador de Términos del Protocolo
@@ -7,10 +7,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
  * para ayudar en la búsqueda bibliográfica.
  */
 class GenerateProtocolTermsUseCase {
-  constructor() {
-    if (process.env.GEMINI_API_KEY) {
-      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    }
+  constructor({ aiService } = {}) {
+    this.aiService = aiService || new AIService();
   }
 
   /**
@@ -41,47 +39,25 @@ class GenerateProtocolTermsUseCase {
         customFocus
       });
       
-      if (!this.gemini) {
-        throw new Error('Gemini no está configurado');
+      if (!this.aiService) {
+        throw new Error('Servicio de IA no configurado');
       }
       
-      let terms = null;
-      let retryCount = 0;
-      const maxRetries = 2;
+      const systemInstruction = "Eres un experto en Bibliometría y Revisiones Sistemáticas (RSL) bajo estándares PRISMA 2020. Respondes ÚNICAMENTE en formato JSON válido.";
+      
+      const text = await this.aiService.generateText(systemInstruction, prompt, 'gemini', {
+        temperature: 0.1,
+        maxOutputTokens: 8192,
+        responseMimeType: "application/json"
+      });
 
-      while (!terms && retryCount < maxRetries) {
-        try {
-          const model = this.gemini.getGenerativeModel({
-            model: "gemini-2.5-pro",
-            systemInstruction: "Eres un experto en Bibliometría y Revisiones Sistemáticas (RSL) bajo estándares PRISMA 2020. Respondes ÚNICAMENTE en formato JSON válido.",
-            generationConfig: {
-              temperature: 0.4,
-              maxOutputTokens: 8192,
-              responseMimeType: "application/json"
-            }
-          });
-          const result = await model.generateContent(prompt);
-          const text = result.response.text();
-          console.log('Respuesta raw (primeros 300 chars):', text.substring(0, 300));
+      console.log('Respuesta raw (primeros 300 chars):', text.substring(0, 300));
 
-          // Parsear la respuesta
-          terms = this.parseResponse(text);
+      // Parsear la respuesta
+      let terms = this.parseResponse(text);
 
-          // Normalizar y validar términos (3-6 por categoría)
-          terms = this.normalizeTerms(terms);
-
-        } catch (parseError) {
-          retryCount++;
-          console.warn(`Intento ${retryCount} falló:`, parseError.message);
-          
-          if (retryCount >= maxRetries) {
-            throw parseError;
-          }
-          
-          // Reintentar con instrucción más estricta
-          console.log('Reintentando con temperatura más baja...');
-        }
-      }
+      // Normalizar y validar términos (3-6 por categoría)
+      terms = this.normalizeTerms(terms);
 
       console.log('Términos generados y validados exitosamente');
       console.log('Términos finales:', JSON.stringify(terms, null, 2));
@@ -279,9 +255,12 @@ RESPONDE SOLO CON EL JSON. NADA MÁS.
    * Parsea la respuesta de la IA con parsing robusto de JSON
    */
   parseResponse(text) {
-    // 1) Buscar el primer bloque JSON en el texto
-    const firstBrace = text.indexOf('{');
-    const lastBrace = text.lastIndexOf('}');
+    // 1) Limpiar JSON usando la utilidad centralizada
+    let jsonStr = this.aiService.cleanJson(text);
+
+    // 2) Asegurar que tomamos solo el objeto JSON (fallback si hay texto extra)
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
     
     if (firstBrace === -1 || lastBrace === -1 || lastBrace <= firstBrace) {
       console.error('No se encontró JSON válido en la respuesta');
@@ -289,15 +268,7 @@ RESPONDE SOLO CON EL JSON. NADA MÁS.
       throw new Error('No se encontró JSON en la respuesta de la IA');
     }
 
-    let jsonStr = text.substring(firstBrace, lastBrace + 1);
-
-    // 2) Limpiar backticks de markdown (```json o ```)
-    jsonStr = jsonStr.replace(/```json\s*/g, '').replace(/```/g, '').trim();
-
-    // 3) Reemplazar comillas "curly" si existen
-    jsonStr = jsonStr
-      .replace(/[\u2018\u2019]/g, "'")  // comillas simples curly
-      .replace(/[\u201C\u201D]/g, '"'); // comillas dobles curly
+    jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
 
     // 4) Intentar parsear
     let parsed;

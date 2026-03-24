@@ -109,6 +109,7 @@ export interface WizardData {
       databaseName: string
       data: any[]
     }>
+    isFragmentedMode?: boolean
   }
 
   protocolDefinition: {

@@ -1,11 +1,8 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const AIService = require('../../infrastructure/services/ai.service');
 
 class GenerateTitlesUseCase {
-  constructor() {
-    // Inicializar OpenAI/ChatGPT
-    if (process.env.GEMINI_API_KEY) {
-      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    }
+  constructor({ aiService } = {}) {
+    this.aiService = aiService || new AIService();
   }
 
   /**
@@ -20,7 +17,7 @@ class GenerateTitlesUseCase {
     try {
       console.log('Generando 5 títulos con validación Cochrane usando Gemini...');
       
-      if (!this.gemini) {
+      if (!this.aiService) {
         throw new Error('No hay proveedor de IA configurado');
       }
       
@@ -64,25 +61,16 @@ class GenerateTitlesUseCase {
    * Genera títulos usando ChatGPT/Gemini
    */
   async _generateWithChatGPT(prompt) {
-    if (!this.gemini) {
-      throw new Error('Gemini API key no configurada');
-    }
-
-    const model = this.gemini.getGenerativeModel({
-      model: "gemini-2.5-pro",
-      systemInstruction: "Eres un Editor en Jefe de un Journal de Ingeniería de alto impacto (Q1). Tu estándar de calidad es extremo. Generas títulos académicos con rigor metodológico PRISMA 2020. Respondes ÚNICAMENTE en formato JSON válido.",
-      generationConfig: {
-        temperature: 0.6,
-        maxOutputTokens: 8192,
-        responseMimeType: "application/json"
-      }
-    });
-
-    const result = await model.generateContent(prompt);
-    let content = result.response.text();
+    const systemInstruction = "Eres un Editor en Jefe de un Journal de Ingeniería de alto impacto (Q1). Tu estándar de calidad es extremo. Generas títulos académicos con rigor metodológico PRISMA 2020. Respondes ÚNICAMENTE en formato JSON válido.";
     
-    // Limpiar posibles bloques de código markdown
-    content = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    let content = await this.aiService.generateText(systemInstruction, prompt, 'gemini', {
+      temperature: 0.1,
+      maxOutputTokens: 8192,
+      responseMimeType: "application/json"
+    });
+    
+    // Limpiar JSON usando la utilidad centralizada
+    content = this.aiService.cleanJson(content);
     
     try {
       return JSON.parse(content);

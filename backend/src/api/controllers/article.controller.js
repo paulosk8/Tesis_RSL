@@ -7,6 +7,7 @@ const ArticleVersionRepository = require('../../infrastructure/repositories/arti
 const ScreeningRecordRepository = require('../../infrastructure/repositories/screening-record.repository');
 const PythonGraphService = require('../../infrastructure/services/python-graph.service');
 const GenerateArticleFromPrismaUseCase = require('../../domain/use-cases/generate-article-from-prisma.use-case');
+const GenerateArticleFromTemplateUseCase = require('../../domain/use-cases/generate-article-from-template.use-case');
 const GeneratePrismaContextUseCase = require('../../domain/use-cases/generate-prisma-context.use-case');
 const ExtractRQSDataUseCase = require('../../domain/use-cases/extract-rqs-data.use-case');
 const ExtractFullTextDataUseCase = require('../../domain/use-cases/extract-fulltext-data.use-case');
@@ -505,6 +506,10 @@ class ArticleController {
         });
       }
 
+      // ✅ Extender timeout del request a 10 minutos (artículo hace llamadas IA largas)
+      if (req.setTimeout) req.setTimeout(600000);
+      if (res.setTimeout) res.setTimeout(600000);
+
       // Generar artículo si no se ha generado aún
       const aiService = new AIService(req.userId);
       
@@ -841,6 +846,10 @@ You can modify:
         });
       }
 
+      // ✅ Extender timeout del request a 10 minutos (artículo hace llamadas IA largas)
+      if (req.setTimeout) req.setTimeout(600000);
+      if (res.setTimeout) res.setTimeout(600000);
+
       // Generar artículo
       const aiService = new AIService(req.userId);
       
@@ -1000,6 +1009,56 @@ You can modify:
     });
 
     return csv;
+  }
+
+  /**
+   * POST /api/projects/:projectId/article/custom-template
+   * Generar artículo basado en una plantilla de revista (PDF/LaTeX)
+   */
+  async generateCustomFormattedArticle(req, res) {
+    try {
+      const { projectId } = req.params;
+      const templateFile = req.file;
+
+      if (!templateFile) {
+        return res.status(400).json({
+          success: false,
+          message: 'Debe subir un archivo de plantilla (PDF o LaTeX)'
+        });
+      }
+
+      // Verificar permisos
+      const isOwner = await this.projectRepository.isOwner(projectId, req.userId);
+      if (!isOwner) {
+        return res.status(403).json({
+          success: false,
+          message: 'No tienes permiso para generar versiones de este artículo'
+        });
+      }
+
+      // ✅ Extender timeout del request a 10 minutos (artículo hace llamadas IA largas)
+      if (req.setTimeout) req.setTimeout(600000);
+      if (res.setTimeout) res.setTimeout(600000);
+
+      const aiService = new AIService(req.userId);
+      const useCase = new GenerateArticleFromTemplateUseCase({
+        articleVersionRepository: this.articleVersionRepository,
+        aiService: aiService
+      });
+
+      const result = await useCase.execute(projectId, templateFile);
+
+      res.status(200).json(result);
+
+    } catch (error) {
+      console.error('❌ Error generando artículo con plantilla personalizada:', error);
+      res.status(500).json({
+        success: false,
+        message: error.message || 'Error al procesar la plantilla de la revista',
+        error: error.message,
+        stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      });
+    }
   }
 
   /**

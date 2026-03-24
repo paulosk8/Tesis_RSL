@@ -9,9 +9,9 @@ const ScreenReferencesWithEmbeddingsUseCase = require('./screen-references-embed
  * de un proyecto utilizando IA (LLM o Embeddings).
  */
 class RunProjectScreeningUseCase {
-  constructor() {
+  constructor({ aiService } = {}) {
     this.referenceRepository = new ReferenceRepository();
-    this.screenAIUseCase = new ScreenReferencesWithAIUseCase();
+    this.screenAIUseCase = new ScreenReferencesWithAIUseCase({ aiService });
     this.screenEmbeddingsUseCase = new ScreenReferencesWithEmbeddingsUseCase();
   }
 
@@ -153,7 +153,7 @@ class RunProjectScreeningUseCase {
    * Ejecuta cribado HÍBRIDO: Embeddings + ChatGPT para zona gris
    * OPCIÓN 3 RECOMENDADA
    */
-  async executeHybrid({ projectId, protocol, embeddingThreshold = 0.15, aiProvider = 'chatgpt', progressCallback = null }) {
+  async executeHybrid({ projectId, protocol, embeddingThreshold = 0.15, aiProvider = 'chatgpt', progressCallback = null, isFragmented = false }) {
     try {
       console.log(`[HYBRID] Ejecutando cribado HÍBRIDO para proyecto ${projectId}...`);
       console.log(`[HYBRID] Fase 1: Embeddings (threshold: ${embeddingThreshold})`);
@@ -337,7 +337,8 @@ class RunProjectScreeningUseCase {
             inclusionCriteria: protocol.inclusionCriteria || [],
             exclusionCriteria: protocol.exclusionCriteria || [],
             researchQuestion: protocol.researchQuestion || '',
-            aiProvider
+            aiProvider,
+            isFragmented
           });
 
           const refDuration = ((Date.now() - refStartTime) / 1000).toFixed(1);
@@ -593,7 +594,7 @@ ${item.llmCriteriosNoCumplidos ? `\nNo cumple: ${item.llmCriteriosNoCumplidos.jo
   /**
    * Ejecuta cribado con LLM para todo el proyecto
    */
-  async executeLLM({ projectId, protocol, model = 'gemini-2.0-flash-exp' }) {
+  async executeLLM({ projectId, protocol, model = 'gemini-2.0-flash-exp', isFragmented = false }) {
     try {
       console.log(`🔍 Ejecutando cribado con LLM para proyecto ${projectId}...`);
 
@@ -626,7 +627,8 @@ ${item.llmCriteriosNoCumplidos ? `\nNo cumple: ${item.llmCriteriosNoCumplidos.jo
           const result = await this.screenAIUseCase.execute({
             reference,
             protocol,
-            model
+            model,
+            isFragmented
           });
 
           await this.referenceRepository.updateScreeningResult({

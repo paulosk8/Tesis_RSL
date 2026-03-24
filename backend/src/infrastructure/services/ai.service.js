@@ -28,31 +28,33 @@ class AIService {
    * - generateText(systemInstructions, userContent) - Separado
    * 
    * @param {string} promptOrSystem - Prompt completo o instrucción del sistema
-   * @param {string} contentOrProvider - Contenido del usuario o provider (ignorado ahora)
+   * @param {string|Object} contentOrProvider - Contenido del usuario o provider
    * @param {string} providerOverride - Provider explícito (ignorado)
+   * @param {Object} options - Opciones de generación (temperature, responseMimeType, etc)
    * @returns {Promise<string>} Texto generado
    */
   async generateText(promptOrSystem, contentOrProvider = null, providerOverride = null, options = {}) {
-    let systemPrompt, userPrompt;
+    let systemPrompt, userContent;
     
     // Detectar modo de uso
     if (contentOrProvider === null || contentOrProvider === undefined) {
       // Modo 1: generateText(fullPrompt)
       systemPrompt = "Eres un asistente experto en análisis académico.";
-      userPrompt = promptOrSystem;
-    } else if (['chatgpt', 'gemini'].includes(contentOrProvider)) {
+      userContent = promptOrSystem;
+    } else if (contentOrProvider === 'chatgpt' || contentOrProvider === 'gemini') {
       // Modo 2: fallback compatibility
       systemPrompt = "Eres un asistente experto en análisis académico.";
-      userPrompt = promptOrSystem;
+      userContent = promptOrSystem;
     } else {
       // Modo 3: generateText(systemPrompt, userContent)
       systemPrompt = promptOrSystem;
-      userPrompt = contentOrProvider;
+      userContent = contentOrProvider;
     }
 
     try {
       if (this.gemini) {
-        return await this._generateWithGemini(systemPrompt, userPrompt, 5, options);
+        // userContent puede ser string o array de partes [{text: '...'}, {inlineData: {...}}]
+        return await this._generateWithGemini(systemPrompt, userContent, 5, options);
       } else {
         throw new Error('No hay proveedores de IA configurados');
       }
@@ -66,19 +68,28 @@ class AIService {
    * Genera texto con Gemini 2.5 Pro
    * @private
    */
-  async _generateWithGemini(systemPrompt, userPrompt, maxRetries = 5, options = {}) {
+  async _generateWithGemini(systemPrompt, userContent, maxRetries = 5, options = {}) {
     if (!this.gemini) {
       throw new Error('Gemini API key no configurada');
     }
 
-    // Modelos a intentar en orden de preferencia
-    const modelsToTry = ['gemini-1.5-pro', 'gemini-1.5-flash'];
+    // Modelos a intentar en orden de preferencia (V1beta tiene mejor soporte para archivos/LaTeX)
+    // Se usan los nombres confirmados mediante discovery en la cuenta del usuario
+    const modelsToTry = [
+      'gemini-2.5-pro',
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-flash-latest',
+      'gemini-pro-latest',
+      'gemini-1.5-pro',
+      'gemini-1.5-flash'
+    ];
     let lastError = null;
     let tokensUsed = 0;
 
     // Configuración de generación
     const generationConfig = {
-      temperature: options.temperature !== undefined ? options.temperature : 0.3,
+      temperature: options.temperature !== undefined ? options.temperature : 0.1,
       maxOutputTokens: options.maxOutputTokens || 8192,
       topP: options.topP,
       topK: options.topK,
@@ -90,24 +101,78 @@ class AIService {
     for (const modelName of modelsToTry) {
       for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
-          console.log(`🤖 [${modelName}] Intento ${attempt}/${maxRetries} (Temp: ${generationConfig.temperature})...`);
-          const model = this.gemini.getGenerativeModel({ 
-            model: modelName,
-            systemInstruction: systemPrompt,
-            generationConfig
-          });
-
-          const result = await model.generateContent(userPrompt);
-          const response = await result.response;
+          console.log(`🤖 [${modelName}] Intento ${attempt}/${maxRetries} (API: v1beta)...`);
           
-          tokensUsed = response.usageMetadata?.totalTokenCount || 0;
+          // Usar v1beta para soporte multimodal completo
+          // IMPORTANTE: NO usamos systemInstruction en el constructor para evitar errores 400 en algunas regiones
+          const model = this.gemini.getGenerativeModel(
+            { model: modelName },
+            { apiVersion: 'v1beta' }
+          );
+
+          // CONSTRUIR PROMPT MANUALMENTE (Máxima compatibilidad)
+          // Prependemos las instrucciones del sistema al contenido del usuario
+          let requestContents = [];
+          
+          if (Array.isArray(userContent)) {
+            // Si es un array de partes (texto + archivos/inlineData)
+            requestContents = [
+              { role: 'user', parts: [{ text: `INSTRUCCIONES DEL SISTEMA:\n${systemPrompt}\n\n---\n\n` }, ...userContent] }
+            ];
+          } else {
+            // Si es solo texto
+            requestContents = [
+              { role: 'user', parts: [{ text: `${systemPrompt}\n\n---\n\n${userContent}` }] }
+            ];
+          }
+
+          let fullText = "";
+          let currentRequestContents = [...requestContents];
+          let isDone = false;
+          let continuationAttempts = 0;
+          const MAX_CONTINUATIONS = 5;
+
+          while (!isDone && continuationAttempts < MAX_CONTINUATIONS) {
+            const result = await model.generateContent({
+              contents: currentRequestContents,
+              generationConfig
+            });
+
+            const response = await result.response;
+            const textChunk = response.text();
+            fullText += textChunk;
+            
+            const finishReason = response.candidates?.[0]?.finishReason;
+            const currentTokens = response.usageMetadata?.totalTokenCount || 0;
+            tokensUsed += currentTokens;
+
+            if (finishReason === 'MAX_TOKENS') {
+              console.log(`⚠️ Límite de tokens alcanzado. Solicitando continuación... (Intento ${continuationAttempts + 1}/${MAX_CONTINUATIONS})`);
+              // Añadir la respuesta del asistente al historial
+              currentRequestContents.push({ role: 'model', parts: [{ text: textChunk }] });
+              // Añadir instrucción de continuar
+              currentRequestContents.push({ 
+                role: 'user', 
+                parts: [{ text: "La respuesta se cortó por límite de longitud. Continúa generando EXACTAMENTE desde donde te quedaste, sin repetir palabras previas, sin saludos, sin formato extra. SOLO LA CONTINUACIÓN DIRECTA del código o texto." }] 
+              });
+              continuationAttempts++;
+            } else {
+              isDone = true;
+            }
+          }
+
+          if (continuationAttempts >= MAX_CONTINUATIONS) {
+            console.warn(`⚠️ Se alcanzó el número máximo de continuaciones (${MAX_CONTINUATIONS}). El texto podría estar incompleto.`);
+          }
+
           await this._trackUsage('gemini', 'generateContent', modelName, tokensUsed, true, null);
-          console.log(`✅ Respuesta recibida de ${modelName} (intento ${attempt})`);
-          return response.text();
+          console.log(`✅ Respuesta recibida de ${modelName} (intento ${attempt}), continuaciones: ${continuationAttempts}`);
+          return fullText;
 
         } catch (error) {
           lastError = error;
           const errorMessage = error.message.toLowerCase();
+          console.warn(`⚠️ [${modelName}] Error en intento ${attempt}: ${error.message}`);
 
           // Errores de red transitorios: reintentar con backoff
           const isNetworkError = 
@@ -126,28 +191,30 @@ class AIService {
             errorMessage.includes('too many requests') ||
             errorMessage.includes('resource_exhausted');
 
-          // Errores de modelo no disponible: saltar al siguiente modelo
+          // Errores de modelo no disponible
           const isModelUnavailable =
             errorMessage.includes('404') ||
             errorMessage.includes('not found') ||
             errorMessage.includes('not supported') ||
-            errorMessage.includes('model') && errorMessage.includes('unavailable');
+            errorMessage.includes('unsupported') ||
+            (errorMessage.includes('model') && errorMessage.includes('unavailable'));
 
-          if (isModelUnavailable) {
-            console.warn(`⚠️ Modelo ${modelName} no disponible, intentando siguiente modelo...`);
+          if (isModelUnavailable || errorMessage.includes('limit: 0')) {
+            const reason = isModelUnavailable ? 'no disponible' : 'con cuota 0';
+            console.warn(`⚠️ Modelo ${modelName} ${reason}, saltando al siguiente...`);
             await this._trackUsage('gemini', 'generateContent', modelName, 0, false, error.message);
             break; // Salir del bucle de reintentos para este modelo
           }
 
           if ((isNetworkError || isRateLimit) && attempt < maxRetries) {
             const waitSeconds = isRateLimit ? 25 * attempt : 5 * attempt;
-            console.warn(`⏳ [${modelName}] Intento ${attempt}/${maxRetries} fallido (${isRateLimit ? 'rate limit' : 'error de red'}). Reintentando en ${waitSeconds}s...`);
+            console.warn(`⏳ [${modelName}] Reintentando en ${waitSeconds}s...`);
             await new Promise(resolve => setTimeout(resolve, waitSeconds * 1000));
             continue;
           }
 
           // Error no recuperable en este modelo
-          console.error(`❌ [${modelName}] Fallido definitivamente:`, error.message);
+          console.error(`❌ [${modelName}] Fallido definitivamente en este modelo.`);
           await this._trackUsage('gemini', 'generateContent', modelName, 0, false, error.message);
           break; // Intentar el siguiente modelo
         }
@@ -179,6 +246,33 @@ class AIService {
       await this._trackUsage('embeddings', 'embedContent', 'text-embedding-004', 0, false, error.message);
       throw error;
     }
+  }
+
+  /**
+   * Limpia y sanea una cadena JSON proveniente de la IA
+   * Elimina bloques de código markdown y caracteres de control problemáticos
+   * @param {string} content 
+   * @returns {string}
+   */
+  cleanJson(content) {
+    if (!content || typeof content !== 'string') return content;
+    
+    let cleaned = content.trim();
+    
+    // 1. Eliminar bloques de código markdown
+    cleaned = cleaned.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    
+    // 2. Extraer solo el objeto JSON inicial si hay basura antes o después
+    const firstBrace = cleaned.indexOf('{');
+    const lastBrace = cleaned.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      cleaned = cleaned.substring(firstBrace, lastBrace + 1);
+    }
+    
+    // 3. Limpiar caracteres de control ilegales, PERO dejar \n, \r y \t que son estructurales
+    cleaned = cleaned.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+
+    return cleaned;
   }
 
   /**

@@ -4,12 +4,12 @@ import { useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { 
-  FileCode, 
-  FileText, 
-  Database, 
-  Image, 
-  Package, 
+import {
+  FileCode,
+  FileText,
+  Database,
+  Image,
+  Package,
   Download,
   Loader2,
   CheckCircle2,
@@ -36,7 +36,8 @@ export function ExportPanel({ projectId, canExport, blockingReason, onRegenerate
     try {
       setLoading(type)
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/projects/${projectId}/article/export/${endpoint}`, {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001'
+      const response = await fetch(`${API_URL}/api/projects/${projectId}/article/export/${endpoint}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('token')}`,
@@ -146,8 +147,8 @@ export function ExportPanel({ projectId, canExport, blockingReason, onRegenerate
             </CardDescription>
           </div>
           {onRegenerate && (
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               variant="outline"
               onClick={onRegenerate}
               disabled={!canExport || isRegenerating}
@@ -172,7 +173,7 @@ export function ExportPanel({ projectId, canExport, blockingReason, onRegenerate
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              {blockingReason === 'PRISMA_INCOMPLETE' 
+              {blockingReason === 'PRISMA_INCOMPLETE'
                 ? 'Complete todos los ítems PRISMA antes de exportar el artículo.'
                 : 'Debe generar el artículo antes de poder exportar los activos.'}
             </AlertDescription>
@@ -216,8 +217,8 @@ export function ExportPanel({ projectId, canExport, blockingReason, onRegenerate
         <Alert>
           <CheckCircle2 className="h-4 w-4" />
           <AlertDescription className="text-xs">
-            <strong>Nota:</strong> Los gráficos incluyen versiones vectoriales (PDF) requeridas por 
-            journals de alto impacto (IEEE, Elsevier, Springer, MDPI). El paquete completo incluye 
+            <strong>Nota:</strong> Los gráficos incluyen versiones vectoriales (PDF) requeridas por
+            journals de alto impacto (IEEE, Elsevier, Springer, MDPI). El paquete completo incluye
             todo lo necesario para compilar en Overleaf o LaTeX local.
           </AlertDescription>
         </Alert>

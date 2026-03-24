@@ -1,15 +1,12 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const AIService = require('../../infrastructure/services/ai.service');
 
 /**
  * Caso de uso: Cribado automático de referencias con IA
  * Analiza referencias bibliográficas y las clasifica según criterios de inclusión/exclusión
  */
 class ScreenReferencesWithAIUseCase {
-  constructor() {
-    // Inicializar OpenAI/ChatGPT
-    if (process.env.GEMINI_API_KEY) {
-      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    }
+  constructor({ aiService } = {}) {
+    this.aiService = aiService || new AIService();
   }
 
   /**
@@ -20,17 +17,18 @@ class ScreenReferencesWithAIUseCase {
     inclusionCriteria, 
     exclusionCriteria, 
     researchQuestion,
-    aiProvider = 'chatgpt' 
+    aiProvider = 'chatgpt',
+    isFragmented = false 
   }) {
     if (!reference || !reference.title) {
       throw new Error('Referencia con título es requerida');
     }
 
-    const prompt = this.buildPrompt(reference, inclusionCriteria, exclusionCriteria, researchQuestion);
+    const prompt = this.buildPrompt(reference, inclusionCriteria, exclusionCriteria, researchQuestion, isFragmented);
 
     try {
-      if (!this.gemini) {
-        throw new Error('Gemini API key no configurada');
+      if (!this.aiService) {
+        throw new Error('Servicio de IA no configurado');
       }
 
       const result = await this.generateWithChatGPT(prompt);
@@ -53,7 +51,8 @@ class ScreenReferencesWithAIUseCase {
     inclusionCriteria, 
     exclusionCriteria,
     researchQuestion, 
-    aiProvider = 'chatgpt' 
+    aiProvider = 'chatgpt',
+    isFragmented = false
   }) {
     const results = [];
     
@@ -67,7 +66,8 @@ class ScreenReferencesWithAIUseCase {
           inclusionCriteria, 
           exclusionCriteria,
           researchQuestion,
-          aiProvider 
+          aiProvider,
+          isFragmented
         })
       );
       
@@ -82,8 +82,14 @@ class ScreenReferencesWithAIUseCase {
     };
   }
 
-  buildPrompt(reference, inclusionCriteria, exclusionCriteria, researchQuestion) {
-    return `Eres un experto en revisión sistemática de literatura científica siguiendo metodología PRISMA.
+  buildPrompt(reference, inclusionCriteria, exclusionCriteria, researchQuestion, isFragmented = false) {
+    const fragmentedInstructions = isFragmented ? `
+**MODO DE BÚSQUEDA FRAGMENTADA (Comparación Indirecta):**
+Estamos en una fase de búsqueda fragmentada donde la literatura sobre comparaciones directas es escasa. 
+- Sé más flexible con la inclusión: si un artículo no compara directamente ambas tecnologías pero aporta datos empíricos de rendimiento, benchmarks o análisis técnicos profundos de **al menos uno** de los componentes (Intervención o Comparador) dentro de la población y contexto definidos, cátegorízalo como "incluida" o "revisar_manual".
+- No descartes estudios solo por ser "parciales" si su calidad técnica es alta.` : '';
+
+    return `Eres un experto en revisión sistemática de literatura científica siguiendo metodología PRISMA.${fragmentedInstructions}
 
 **PREGUNTA DE INVESTIGACIÓN:**
 ${researchQuestion || 'No especificada'}
@@ -175,22 +181,15 @@ Responde SOLO con JSON válido.`;
   }
 
   async generateWithChatGPT(prompt) {
-    const model = this.gemini.getGenerativeModel({
-      model: "gemini-2.5-pro",
-      systemInstruction: "Eres un experto en revisión sistemática de literatura científica. Analizas referencias con rigor metodológico siguiendo PRISMA. Respondes en formato JSON válido.",
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 8000,
-        responseMimeType: "application/json"
-      }
+    const systemInstruction = "Eres un experto en revisión sistemática de literatura científica. Analizas referencias con rigor metodológico siguiendo PRISMA. Respondes en formato JSON válido.";
+    
+    const textResult = await this.aiService.generateText(systemInstruction, prompt, 'gemini', {
+      temperature: 0.0,
+      maxOutputTokens: 8000,
+      responseMimeType: "application/json"
     });
-
-    const result = await model.generateContent(prompt);
-    let text = result.response.text().trim();
-    if (text.startsWith('```json')) text = text.replace(/^```json/i, '');
-    else if (text.startsWith('```')) text = text.replace(/^```/i, '');
-    if (text.endsWith('```')) text = text.replace(/```$/i, '');
-    text = text.trim();
+    
+    let text = this.aiService.cleanJson(textResult);
     
     try {
       return JSON.parse(text);

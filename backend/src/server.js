@@ -166,11 +166,11 @@ class Server {
 
     // Rutas principales
     this.app.use('/api/auth', authRoutes);
-    this.app.use('/api/projects', projectRoutes);
+    this.app.use('/api/projects', articleRoutes);
     this.app.use('/api/projects', protocolRoutes);
     this.app.use('/api/projects', prismaRoutes);
-    this.app.use('/api/projects', articleRoutes);
     this.app.use('/api/projects', rqsRoutes);
+    this.app.use('/api/projects', projectRoutes);
     this.app.use('/api/ai', aiRoutes);
     this.app.use('/api/references', referenceRoutes);
     this.app.use('/api/screening', screeningRoutes);

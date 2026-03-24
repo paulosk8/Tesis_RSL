@@ -214,13 +214,8 @@ class ExtractRQSDataUseCase {
       let data;
       if (typeof response === 'string') {
         try {
-          // Remove Markdown block formatting if Gemini wraps it in ```json ... ```
-          let cleanJson = response.trim();
-          if (cleanJson.startsWith('```json')) {
-            cleanJson = cleanJson.replace(/^```json\s*/i, '').replace(/\s*```$/i, '');
-          } else if (cleanJson.startsWith('```')) {
-            cleanJson = cleanJson.replace(/^```\s*/i, '').replace(/\s*```$/i, '');
-          }
+          // Limpiar JSON usando la utilidad centralizada
+          let cleanJson = this.aiService.cleanJson(response);
           data = JSON.parse(cleanJson);
         } catch (parseError) {
           console.error('Error parseando JSON string:', parseError);

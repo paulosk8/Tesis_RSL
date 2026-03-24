@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const AIService = require('../../infrastructure/services/ai.service');
 const {
   sanitizeTerm,
   validateIEEE,
@@ -16,34 +16,29 @@ const {
  * basándose en el protocolo PICO del proyecto.
  */
 class SearchQueryGenerator {
-  constructor() {
-    // Inicializar OpenAI/ChatGPT
-    if (process.env.GEMINI_API_KEY) {
-      this.gemini = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    }
+  constructor({ aiService } = {}) {
+    this.aiService = aiService || new AIService();
   }
 
   /**
    * Genera queries de búsqueda para múltiples bases de datos
    */
-  async generate({ databases = ['scopus', 'ieee'], picoData = {}, protocolTerms = {}, researchArea = '', matrixData = {}, aiProvider = 'chatgpt', yearStart, yearEnd, selectedTitle }) {
+  async generate({ databases = ['scopus', 'ieee'], picoData = {}, protocolTerms = {}, researchArea = '', matrixData = {}, aiProvider = 'chatgpt', yearStart, yearEnd, selectedTitle, fragmentedMode = false }) {
     try {
       console.log('Generando queries de búsqueda...');
       console.log('Título RSL:', selectedTitle || 'No especificado');
       console.log('Rango temporal recibido: yearStart =', yearStart, ', yearEnd =', yearEnd);
+      console.log('Modo Fragmentado:', fragmentedMode);
 
-      const prompt = this.buildPrompt({ databases, picoData, protocolTerms, researchArea, matrixData, yearStart, yearEnd, selectedTitle });
+      const prompt = this.buildPrompt({ databases, picoData, protocolTerms, researchArea, matrixData, yearStart, yearEnd, selectedTitle, fragmentedMode });
       
       let text;
-      if (this.gemini) {
-        const model = this.gemini.getGenerativeModel({
-          model: 'gemini-2.5-pro',
-          generationConfig: { temperature: 0.7 }
+      if (this.aiService) {
+        text = await this.aiService.generateText(prompt, null, 'gemini', {
+          temperature: 0.7
         });
-        const result = await model.generateContent(prompt);
-        text = result.response.text();
       } else {
-        throw new Error('No hay proveedor de IA configurado (OpenAI API Key requerida)');
+        throw new Error('No hay proveedor de IA configurado');
       }
 
       console.log('Respuesta COMPLETA de IA para búsquedas:');
@@ -53,7 +48,7 @@ class SearchQueryGenerator {
       console.log(`Bases de datos solicitadas (${databases.length}):`, databases);
 
       // Parsear la respuesta
-      const queries = this.parseResponse(text, databases, yearStart, yearEnd);
+      const queries = this.parseResponse(text, databases, yearStart, yearEnd, fragmentedMode);
       
       console.log(`Resultado del parseo: ${queries.length} queries de ${databases.length} solicitadas`);
       
@@ -88,7 +83,7 @@ class SearchQueryGenerator {
   /**
    * Construye el prompt consumiendo datos ya validados de pasos anteriores
    */
-  buildPrompt({ databases, picoData, protocolTerms, researchArea, matrixData, yearStart, yearEnd, selectedTitle }) {
+  buildPrompt({ databases, picoData, protocolTerms, researchArea, matrixData, yearStart, yearEnd, selectedTitle, fragmentedMode }) {
     // Extraer términos del protocolo (ya confirmados por el investigador en pasos anteriores)
     const technologies = protocolTerms?.tecnologia || protocolTerms?.technologies || [];
     const domains = protocolTerms?.dominio || protocolTerms?.applicationDomain || [];
@@ -185,23 +180,32 @@ ESTRUCTURA DE CADA QUERY
 
 ⚠️ AJUSTAR NÚMERO DE TÉRMINOS SEGÚN PLATAFORMA:
 
-**ESTRUCTURA PICO COMPLETA:**
-${picoData?.comparison && picoData.comparison.trim() && picoData.comparison !== 'N/A' && picoData.comparison !== 'No especificado' ? 
+**ESTRUCTURA MODO FRAGMENTADO (${fragmentedMode ? 'ACTIVADO' : 'DESACTIVADO'}):**
+${fragmentedMode ? `
+⚠️ ATENCIÓN: Se ha solicitado el Protocolo de Búsqueda Fragmentada para Comparación Indirecta.
+DEBES generar TRES (3) consultas independientes por cada base de datos:
+1. QUERY_UNIFIED (Gold Standard): Intersección completa (P ∩ I ∩ C ∩ O).
+2. QUERY_A (Foco Intervención): (Bloque I: Intervención) AND (Bloque P: Población) AND (Bloque O: Outcomes).
+3. QUERY_B (Foco Comparador): (Bloque C: Comparación) AND (Bloque P: Población) AND (Bloque O: Outcomes).
+` : ''}
+
+**ESTRUCTURA PICO COMPLETA (MODO UNIFICADO NORMAL):**
+${picoData?.comparison && picoData.comparison.trim() && picoData.comparison !== 'N/A' && picoData.comparison !== 'No especificado' && !fragmentedMode ? 
 '(Bloque I: Intervención) AND (Bloque P: Población) AND (Bloque C: Comparación) AND (Bloque O: Outcomes)' : 
 '(Bloque I: Intervención) AND (Bloque P: Población) AND (Bloque O: Outcomes)'}
 
 **IEEE Xplore (RESTRICTIVO - MÁXIMO 10 TÉRMINOS TOTALES):**
-${picoData?.comparison && picoData.comparison.trim() && picoData.comparison !== 'N/A' && picoData.comparison !== 'No especificado' ? 
+${picoData?.comparison && picoData.comparison.trim() && picoData.comparison !== 'N/A' && picoData.comparison !== 'No especificado' && !fragmentedMode ? 
 '(Bloque I: 2 términos) AND (Bloque P: 2 términos) AND (Bloque C: 2 términos) AND (Bloque O: 2 términos)\nResultado: 2×2×2×2 = 8 términos ✅' : 
 '(Bloque I: 2 términos) AND (Bloque P: 2 términos) AND (Bloque O: 2 términos)\nResultado: 2×2×2 = 8 términos ✅'}
 
 **ScienceDirect (MODERADO - 3-4 TÉRMINOS POR GRUPO):**
-${picoData?.comparison && picoData.comparison.trim() && picoData.comparison !== 'N/A' && picoData.comparison !== 'No especificado' ? 
+${picoData?.comparison && picoData.comparison.trim() && picoData.comparison !== 'N/A' && picoData.comparison !== 'No especificado' && !fragmentedMode ? 
 '(Bloque I: 3 términos) AND (Bloque P: 3 términos) AND (Bloque C: 3 términos) AND (Bloque O: 3 términos)\nResultado: 3×3×3×3 = 12 términos' : 
 '(Bloque I: 3-4 términos) AND (Bloque P: 3-4 términos) AND (Bloque O: 3-4 términos)\nResultado: 3×3×3 = 9 a 4×4×4 = 16 términos'}
 
 **Scopus/WoS/ACM (ESTÁNDAR):**
-${picoData?.comparison && picoData.comparison.trim() && picoData.comparison !== 'N/A' && picoData.comparison !== 'No especificado' ? 
+${picoData?.comparison && picoData.comparison.trim() && picoData.comparison !== 'N/A' && picoData.comparison !== 'No especificado' && !fragmentedMode ? 
 '(Bloque I: 2-3 términos) AND (Bloque P: 2-3 términos) AND (Bloque C: 2-3 términos) AND (Bloque O: 2-3 términos)\nResultado: 2×2×2×2 = 8 a 3×3×3×3 = 16 términos' : 
 '(Bloque I: 2-3 términos) AND (Bloque P: 2-3 términos) AND (Bloque O: 2-3 términos)\nResultado: 2×2×2 = 8 a 3×3×3 = 12 términos'}
 
@@ -230,7 +234,7 @@ FORMATO DE RESPUESTA (TEXTO PLANO, SIN MARKDOWN)
 ═══════════════════════════════════════════════════════════════
 
 DATABASE: [Nombre exacto]
-QUERY: [Cadena completa en una sola línea]
+${fragmentedMode ? `QUERY_UNIFIED: [Cadena Completa]\nQUERY_A: [Cadena Bloque A]\nQUERY_B: [Cadena Bloque B]` : `QUERY: [Cadena completa en una sola línea]`}
 EXPLANATION: [Términos incluidos con origen PICO + términos EXCLUIDOS por redundancia y por qué]
 
 ---
@@ -287,7 +291,7 @@ GENERA LAS ${databases.length} CADENAS DE BÚSQUEDA BALANCEADAS AHORA:
   /**
    * Parsea y sanitiza la respuesta de la IA con resilencia a múltiples formatos
    */
-  parseResponse(text, databases, yearStart, yearEnd) {
+  parseResponse(text, databases, yearStart, yearEnd, fragmentedMode = false) {
     console.log('Parseando queries de búsqueda...');
     console.log(`Total de líneas a parsear: ${text.split('\n').length}`);
     console.log(`Bases de datos solicitadas: ${databases.join(', ')}`);
@@ -306,34 +310,73 @@ GENERA LAS ${databases.length} CADENAS DE BÚSQUEDA BALANCEADAS AHORA:
       const lines = block.split('\n');
       const dbName = lines[0].trim();
       
-      // Buscar la línea que empieza con QUERY:
-      const queryLine = lines.find(l => l.toUpperCase().startsWith('QUERY:'));
-      const explanationLine = lines.find(l => l.toUpperCase().startsWith('EXPLANATION:'));
+      // Dependiendo del modo, buscar QUERY o QUERY_UNIFIED/QUERY_A/QUERY_B
+      if (fragmentedMode) {
+        const queryUnifiedLine = lines.find(l => l.toUpperCase().startsWith('QUERY_UNIFIED:'));
+        const queryALine = lines.find(l => l.toUpperCase().startsWith('QUERY_A:'));
+        const queryBLine = lines.find(l => l.toUpperCase().startsWith('QUERY_B:'));
+        const explanationLine = lines.find(l => l.toUpperCase().startsWith('EXPLANATION:'));
 
-      if (dbName && queryLine) {
-        const parsedQuery = {
-          database: dbName,
-          query: queryLine.replace(/QUERY\s*:/i, '').trim(),
-          explanation: explanationLine ? explanationLine.replace(/EXPLANATION\s*:/i, '').trim() : ''
-        };
-        
-        // Si la query se cortó, buscar líneas siguientes
-        const queryIndex = lines.findIndex(l => l.toUpperCase().startsWith('QUERY:'));
-        const explanationIndex = lines.findIndex(l => l.toUpperCase().startsWith('EXPLANATION:'));
-        
-        // Concatenar líneas adicionales de query (hasta EXPLANATION o fin de bloque)
-        if (queryIndex !== -1) {
-          const endIndex = explanationIndex !== -1 ? explanationIndex : lines.length;
-          for (let i = queryIndex + 1; i < endIndex; i++) {
-            const line = lines[i].trim();
-            if (line && !line.match(/^---+$/) && !line.toUpperCase().startsWith('DATABASE:')) {
-              parsedQuery.query += ' ' + line;
+        if (dbName) {
+          const explanation = explanationLine ? explanationLine.replace(/EXPLANATION\s*:/i, '').trim() : '';
+          
+          if (queryUnifiedLine) {
+            queries.push({
+              database: dbName,
+              block: 'U', // Unified
+              query: queryUnifiedLine.replace(/QUERY_UNIFIED\s*:/i, '').trim(),
+              explanation: explanation
+            });
+          }
+
+          if (queryALine) {
+            queries.push({
+              database: dbName,
+              block: 'A',
+              query: queryALine.replace(/QUERY_A\s*:/i, '').trim(),
+              explanation: explanation
+            });
+          }
+          
+          if (queryBLine) {
+            queries.push({
+              database: dbName,
+              block: 'B',
+              query: queryBLine.replace(/QUERY_B\s*:/i, '').trim(),
+              explanation: explanation
+            });
+          }
+          console.log(`Queries parseadas para: ${dbName} (Fragmentación Triple)`);
+        }
+      } else {
+        const queryLine = lines.find(l => l.toUpperCase().startsWith('QUERY:'));
+        const explanationLine = lines.find(l => l.toUpperCase().startsWith('EXPLANATION:'));
+
+        if (dbName && queryLine) {
+          const parsedQuery = {
+            database: dbName,
+            query: queryLine.replace(/QUERY\s*:/i, '').trim(),
+            explanation: explanationLine ? explanationLine.replace(/EXPLANATION\s*:/i, '').trim() : ''
+          };
+          
+          // Si la query se cortó, buscar líneas siguientes
+          const queryIndex = lines.findIndex(l => l.toUpperCase().startsWith('QUERY:'));
+          const explanationIndex = lines.findIndex(l => l.toUpperCase().startsWith('EXPLANATION:'));
+          
+          // Concatenar líneas adicionales de query (hasta EXPLANATION o fin de bloque)
+          if (queryIndex !== -1) {
+            const endIndex = explanationIndex !== -1 ? explanationIndex : lines.length;
+            for (let i = queryIndex + 1; i < endIndex; i++) {
+              const line = lines[i].trim();
+              if (line && !line.match(/^---+$/) && !line.toUpperCase().startsWith('DATABASE:')) {
+                parsedQuery.query += ' ' + line;
+              }
             }
           }
+          
+          queries.push(parsedQuery);
+          console.log(`Query parseada para: ${dbName}`);
         }
-        
-        queries.push(parsedQuery);
-        console.log(`Query parseada para: ${dbName}`);
       }
     }
 
