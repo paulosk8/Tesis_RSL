@@ -556,9 +556,45 @@ def draw_bubble_chart(data, output_path):
         plt.close()
         return
     
-    # Extract unique metrics and tools
-    metrics = sorted(list(set([e['metric'] for e in entries if 'metric' in e])))
-    tools = sorted(list(set([e['tool'] for e in entries if 'tool' in e])))
+    # Count frequencies for SLR Aggregation
+    metric_freq = {}
+    tool_freq = {}
+    for e in entries:
+        m = e.get('metric')
+        t = e.get('tool')
+        s = e.get('studies', 0)
+        if m: metric_freq[m] = metric_freq.get(m, 0) + s
+        if t: tool_freq[t] = tool_freq.get(t, 0) + s
+
+    # Get top 12 metrics and tools
+    top_metrics = sorted(metric_freq, key=metric_freq.get, reverse=True)[:12]
+    top_tools = sorted(tool_freq, key=tool_freq.get, reverse=True)[:12]
+    
+    # Create aggregated entries
+    agg_entries = {}
+    for e in entries:
+        m = e.get('metric')
+        t = e.get('tool')
+        s = e.get('studies', 0)
+        if not m or not t: continue
+        
+        m_label = m if m in top_metrics else 'Other Metrics'
+        t_label = t if t in top_tools else 'Other Tools'
+        
+        key = (m_label, t_label)
+        agg_entries[key] = agg_entries.get(key, 0) + s
+
+    # Rebuild metrics and tools lists ensuring 'Other' is at the end
+    metrics = [m for m in top_metrics]
+    if any(k[0] == 'Other Metrics' for k in agg_entries.keys()) and 'Other Metrics' not in metrics:
+        metrics.append('Other Metrics')
+        
+    tools = [t for t in top_tools]
+    if any(k[1] == 'Other Tools' for k in agg_entries.keys()) and 'Other Tools' not in tools:
+        tools.append('Other Tools')
+
+    # Reassign entries for downstream logic
+    entries = [{'metric': k[0], 'tool': k[1], 'studies': v} for k, v in agg_entries.items()]
     
     if not metrics or not tools:
         print("Ã¢Å¡Â Ã¯Â¸Â  Datos incompletos para bubble chart", file=sys.stderr)
@@ -574,55 +610,83 @@ def draw_bubble_chart(data, output_path):
     metric_pos = {m: i for i, m in enumerate(metrics)}
     tool_pos = {t: i for i, t in enumerate(tools)}
     
-    # Prepare data for scatter
-    x_vals = []
-    y_vals = []
-    sizes = []
-    colors = []
+    # Dynamic sizing based on data length
+    fig_width = max(12, len(metrics) * 0.8)
+    fig_height = max(8, len(tools) * 0.6)
+    fig, ax = plt.subplots(figsize=(fig_width, fig_height))
     
-    # Color palette
-    color_palette = [SCIENTIFIC_BLUE, SCIENTIFIC_ACCENT, SCIENTIFIC_SUCCESS, 
-                     SCIENTIFIC_WARNING, SCIENTIFIC_DANGER, SCIENTIFIC_GRAY]
+    use_heatmap = len(entries) > 30 or (len(metrics) * len(tools) > 40)
     
-    for entry in entries:
-        if 'metric' in entry and 'tool' in entry and 'studies' in entry:
-            x_vals.append(metric_pos[entry['metric']])
-            y_vals.append(tool_pos[entry['tool']])
-            sizes.append(entry['studies'] * 300)  # Scale for visibility
-            colors.append(color_palette[tool_pos[entry['tool']] % len(color_palette)])
-    
-    fig, ax = plt.subplots(figsize=(12, 8))
-    
-    # Scatter plot
-    scatter = ax.scatter(x_vals, y_vals, s=sizes, c=colors, alpha=0.6, 
-                         edgecolors='#333333', linewidth=1.5)
-    
-    # Add study count labels
-    for i, entry in enumerate(entries):
-        if 'metric' in entry and 'tool' in entry and 'studies' in entry:
-            ax.text(x_vals[i], y_vals[i], str(entry['studies']), 
-                    ha='center', va='center', fontsize=9, family='serif', 
-                    fontweight='bold', color='white')
-    
+    if use_heatmap:
+        # Create Heatmap for Dense SLR Datasets
+        heatmap_data = np.zeros((len(tools), len(metrics)))
+        for entry in entries:
+            if 'metric' in entry and 'tool' in entry and 'studies' in entry:
+                m_idx = metric_pos[entry['metric']]
+                t_idx = tool_pos[entry['tool']]
+                heatmap_data[t_idx, m_idx] += entry['studies']
+                
+        # Use a professional blue colormap
+        im = ax.imshow(heatmap_data, cmap='Blues', aspect='auto')
+        
+        # Colorbar
+        cbar = ax.figure.colorbar(im, ax=ax)
+        cbar.ax.set_ylabel("Number of Studies", rotation=-90, va="bottom", family='serif', labelpad=15)
+        
+        # Annotate cells with counts
+        threshold = np.max(heatmap_data) / 2.0
+        for i in range(len(tools)):
+            for j in range(len(metrics)):
+                val = heatmap_data[i, j]
+                if val > 0:
+                    text_color = "white" if val > threshold else "black"
+                    ax.text(j, i, int(val), ha="center", va="center", color=text_color, family='serif', fontweight='bold', fontsize=9)
+                    
+        ax.set_title('Dimension Mapping: Metrics vs Tools (Heatmap Overview)', fontsize=12, fontweight='bold', family='serif', pad=12)
+        
+    else:
+        # Prepare data for scatter
+        x_vals = []
+        y_vals = []
+        sizes = []
+        colors = []
+        
+        color_palette = [SCIENTIFIC_BLUE, SCIENTIFIC_ACCENT, SCIENTIFIC_SUCCESS, SCIENTIFIC_WARNING, SCIENTIFIC_DANGER, SCIENTIFIC_GRAY]
+        
+        for entry in entries:
+            if 'metric' in entry and 'tool' in entry and 'studies' in entry:
+                x_vals.append(metric_pos[entry['metric']])
+                y_vals.append(tool_pos[entry['tool']])
+                sizes.append(entry['studies'] * 300)
+                colors.append(color_palette[tool_pos[entry['tool']] % len(color_palette)])
+        
+        max_studies = max([e['studies'] for e in entries if 'studies' in e]) if entries else 1
+        base_size = 1500 / max_studies
+        scaled_sizes = [s / 300 * base_size for s in sizes]
+        
+        scatter = ax.scatter(x_vals, y_vals, s=scaled_sizes, c=colors, alpha=0.6, edgecolors='#333333', linewidth=1.5)
+        
+        for i, entry in enumerate(entries):
+            if 'metric' in entry and 'tool' in entry and 'studies' in entry:
+                ax.text(x_vals[i], y_vals[i], str(entry['studies']), ha='center', va='center', fontsize=9, family='serif', fontweight='bold', color='white')
+        
+        ax.set_title('Dimension Mapping: Metrics vs Tools\n(Size = Number of Studies)', fontsize=12, fontweight='bold', family='serif', pad=12)
+        
     ax.set_xlabel('Performance Metrics', fontsize=11, family='serif')
     ax.set_ylabel('Tools/Technologies', fontsize=11, family='serif')
-    ax.set_title('Dimension Mapping: Metrics vs Tools\n(Size = Number of Studies)', 
-                 fontsize=12, fontweight='bold', family='serif', pad=12)
     
     ax.set_xticks(range(len(metrics)))
-    ax.set_xticklabels(metrics, rotation=45, ha='right', fontsize=9)
+    ax.set_xticklabels(metrics, rotation=45, ha='right', rotation_mode='anchor', fontsize=9)
     ax.set_yticks(range(len(tools)))
     ax.set_yticklabels(tools, fontsize=9)
     
-    # Grid
-    ax.grid(True, linestyle='--', linewidth=0.3, alpha=0.3, color='#cccccc')
-    ax.set_axisbelow(True)
-    
-    # Clean spines
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.spines['left'].set_linewidth(0.8)
-    ax.spines['bottom'].set_linewidth(0.8)
+    if not use_heatmap:
+        ax.grid(True, linestyle='--', linewidth=0.3, alpha=0.3, color='#cccccc')
+        ax.set_axisbelow(True)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['left'].set_linewidth(0.8)
+        ax.spines['bottom'].set_linewidth(0.8)
     
     plt.tight_layout()
     save_figure(fig, output_path)
@@ -660,15 +724,27 @@ def draw_technical_synthesis(data, output_path):
     display_cols = ['study', 'tool']
     metric_cols = [col for col in df.columns if col not in ['study', 'tool']]
     display_cols.extend(metric_cols)
-    
-    # Filter out columns that are all null/empty
-    non_empty_cols = ['study', 'tool']
+    # Filter out columns that are all null/empty and keep valid metrics
+    non_empty_metrics = []
     for col in metric_cols:
         if df[col].notna().any() and not (df[col] == '').all():
-            non_empty_cols.append(col)
+            # Count how many non-null values it has to sort by relevance/frequency
+            non_empty_metrics.append((col, df[col].notna().sum()))
+            
+    # Sort metrics by frequency (descending) and take top 3 for extreme readability
+    non_empty_metrics.sort(key=lambda x: x[1], reverse=True)
+    top_metrics = [m[0] for m in non_empty_metrics[:3]]
     
-    display_cols = non_empty_cols
+    display_cols = ['study', 'tool'] + top_metrics
     df_display = df[display_cols].copy()
+    
+    # Cap studies natively to Top 10 according to SLR methodology for large datasets
+    if len(df_display) > 10:
+        df_display = df_display.head(10)
+        # Add a footer note below
+        table_note = "Table truncated to display the top 10 most relevant studies and the top 3 primary metrics."
+    else:
+        table_note = ""
     
     # DYNAMIC: Format column names generically
     col_labels = []

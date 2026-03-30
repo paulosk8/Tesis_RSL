@@ -11,7 +11,8 @@ import {
     CheckCircle,
     XCircle,
     Upload,
-    FileText
+    FileText,
+    ExternalLink
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { ApiClient } from "@/lib/api-client"
@@ -100,18 +101,64 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
         }
     }, [classifiedReferences])
 
-    // Helper para obtener el estado de revisión de un artículo
+    // Helper robusto para obtener status MANUAL (aislado del LLM)
+    const getManualReviewStatus = (r: any) => {
+        const s = (r.manualReviewStatus || r.manual_review_status || '').toLowerCase()
+        if (s.includes('included') || s === 'include') return 'included'
+        if (s.includes('excluded') || s === 'exclude') return 'excluded'
+        return 'pending'
+    }
+
+    // Helper robusto para determinar inclusión/exclusión (coincide con backend)
+    const getStandardizedStatus = (r: any) => {
+        const s = (r.manualReviewStatus || r.manual_review_status || r.status || r.screeningStatus || r.screening_status || '').toLowerCase()
+        if (s.includes('included') || s === 'include') return 'included'
+        if (s.includes('excluded') || s === 'exclude') return 'excluded'
+        return 'pending'
+    }
+
+    // Helper para obtener el estado de revisión de un artículo (usado en el renderizado de la lista)
     const getReviewStatus = (refId: string): 'included' | 'excluded' | 'pending' => {
-        return reviewedArticles.get(refId) || 'pending'
+        // Primero prioridad a lo que el usuario acaba de decidir en esta sesión
+        if (reviewedArticles.has(refId)) return reviewedArticles.get(refId)!
+        
+        // Si no, buscar la referencia y DEBE DEVOLVER ESTADO MANUAL
+        const ref = [...allRelevantArticles].find(r => r.id === refId)
+        if (ref) return getManualReviewStatus(ref)
+        
+        return 'pending'
     }
 
     // Calcular artículos disponibles para selección
     const allRelevantArticles = useMemo(() => {
-        return [
+        // Combinar todos los artículos clasificados para buscar manualReviewStatus
+        const allRefs = [
             ...(classifiedReferences?.highConfidenceInclude || []),
-            ...(classifiedReferences?.complementaryRelevant || [])
+            ...(classifiedReferences?.complementaryRelevant || []),
+            ...(classifiedReferences?.highConfidenceExclude || []),
+            ...(classifiedReferences?.complementaryNotRelevant || [])
         ]
-    }, [classifiedReferences])
+
+        // 1. Obtener artículos que la IA considera relevantes
+        const aiRelevant = new Set([
+            ...(classifiedReferences?.highConfidenceInclude || []).map(r => r.id),
+            ...(classifiedReferences?.complementaryRelevant || []).map(r => r.id)
+        ])
+
+        // 2. Filtrar para mostrar:
+        //    a) Los que la IA dice que son relevantes, siempre y cuando NO hayan sido excluidos en el cribado general
+        //    b) CUALQUIERA que ya tenga decisión manual 
+        return allRefs.filter(ref => {
+            const manualStatus = getManualReviewStatus(ref)
+            const hasManualDecision = manualStatus === 'included' || manualStatus === 'excluded' || reviewedArticles.has(ref.id)
+            
+            // Si la IA lo excluyó, o si el status general es excluido y NO tiene decisión manual, no debería mostrarse
+            const isExcludedInScreening = ref.status === 'excluded' || ref.aiClassification === 'exclude' || ref.aiClassification === 'excluded'
+            
+            // Mostrar si tiene revisión manual, o si es relevante para la IA y no fue rigurosamente excluido
+            return hasManualDecision || (aiRelevant.has(ref.id) && (!isExcludedInScreening || hasManualDecision))
+        })
+    }, [classifiedReferences, reviewedArticles])
 
     // Ordenar por score descendente
     const sortedArticles = useMemo(() => {
@@ -143,15 +190,23 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
         return maxDerivativeIndex
     }, [sortedArticles, recommendedCutoff])
 
-    // Usar el Top recomendado (codo) MÁS cualquier artículo que haya sido incluido manualmente (status === 'included')
+    // Usar el Top recomendado (codo) MÁS cualquier artículo que haya sido incluido manualmente o ya revisado
     const recommendedArticles = useMemo(() => {
         const topN = sortedArticles.slice(0, Math.min(elbowIndex, sortedArticles.length))
-        // Rescatar cualquier artículo incluido que se haya quedado fuera del Top N
-        const manualIncludes = sortedArticles.filter(art => 
-            art.status === 'included' && !topN.some(t => t.id === art.id)
-        )
-        return [...topN, ...manualIncludes]
-    }, [sortedArticles, elbowIndex])
+        
+        // Rescatar cualquier artículo que DEBERÍA estar en la lista de revisión manual:
+        // - Los que ya tienen una decisión de revisión manual (para que no desaparezcan)
+        const requiredArticles = sortedArticles.filter(art => {
+            if (topN.some(t => t.id === art.id)) return false // Ya está en el top
+            
+            const manStatus = getManualReviewStatus(art)
+            const hasManualReview = manStatus === 'included' || manStatus === 'excluded' || reviewedArticles.has(art.id)
+            
+            return hasManualReview
+        })
+
+        return [...topN, ...requiredArticles]
+    }, [sortedArticles, elbowIndex, reviewedArticles])
 
     // Obtener artículos seleccionados (todos los recomendados)
     const getSelectedArticles = () => {
@@ -508,18 +563,23 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
 
                                                     <div className="flex items-center gap-2 mt-2">
                                                         {ref.screeningScore && (
-                                                            <Badge variant="outline" className="text-xs h-5">
-                                                                {(ref.screeningScore * 100).toFixed(0)}%
+                                                            <Badge variant="outline" className="text-xs h-5 border-blue-200">
+                                                                {(ref.screeningScore * 100).toFixed(0)}% Similitud
                                                             </Badge>
                                                         )}
                                                         {isIncluded && (
                                                             <Badge className="bg-green-600 text-xs h-5">
-                                                                Incluido
+                                                                Incluido (Manual)
                                                             </Badge>
                                                         )}
                                                         {isExcluded && (
                                                             <Badge className="bg-red-600 text-xs h-5">
-                                                                Excluido
+                                                                Excluido (Manual)
+                                                            </Badge>
+                                                        )}
+                                                        {!isIncluded && !isExcluded && getStandardizedStatus(ref) === 'included' && (
+                                                            <Badge variant="outline" className="text-xs h-5 bg-blue-50 text-blue-700 border-blue-300">
+                                                                Incluido por LLM
                                                             </Badge>
                                                         )}
                                                     </div>
@@ -622,6 +682,14 @@ export function SimplifiedScreeningSummary({ projectId, result, onProceedToManua
                                                         </span>
                                                     </Button>
                                                 </label>
+                                                {selectedArticle.fullTextAvailable && selectedArticle.fullTextUrl && !selectedFile && (
+                                                    <Button type="button" variant="secondary" size="sm" asChild>
+                                                        <a href={selectedArticle.fullTextUrl} target="_blank" rel="noopener noreferrer">
+                                                            <ExternalLink className="h-4 w-4 mr-2" />
+                                                            Ver PDF Cargado
+                                                        </a>
+                                                    </Button>
+                                                )}
                                             </div>
 
                                             {/* Botones de decisión (siempre visibles) */}

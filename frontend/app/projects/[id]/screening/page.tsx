@@ -60,9 +60,10 @@ export default function ScreeningPage({ params }: { params: { id: string } }) {
     const selectedIds = Array.from(selectedForFullText)
     const selectedRefs = references.filter(r => selectedIds.includes(r.id))
 
-    // Todos deben tener manualReviewStatus = 'included' o 'excluded' (NO 'pending' ni null)
+    // Todos deben tener manualReviewStatus o status = 'included' o 'excluded'
     const allReviewed = selectedRefs.every(ref =>
-      ref.manualReviewStatus === 'included' || ref.manualReviewStatus === 'excluded'
+      ref.manualReviewStatus === 'included' || ref.manualReviewStatus === 'excluded' ||
+      ref.status === 'included' || ref.status === 'excluded'
     )
 
     return allReviewed
@@ -102,7 +103,10 @@ export default function ScreeningPage({ params }: { params: { id: string } }) {
             setSelectedForFullText(new Set(protocol.selectedForFullText))
           } else if (refData?.references) {
             const reviewedIds = (refData.references as any[]).filter(
-              (r: any) => r.manualReviewStatus === 'included' || r.manualReviewStatus === 'excluded'
+              (r: any) => {
+                const s = (r.manualReviewStatus || r.manual_review_status || r.status || r.screeningStatus || r.screening_status || '').toLowerCase();
+                return s.includes('included') || s.includes('excluded') || s === 'include' || s === 'exclude';
+              }
             ).map((r: any) => r.id)
             if (reviewedIds.length > 0) {
               setSelectedForFullText(new Set(reviewedIds))
@@ -124,6 +128,15 @@ export default function ScreeningPage({ params }: { params: { id: string } }) {
     }
     loadData()
   }, [params.id])
+
+  // Helper robusto para determinar inclusión/exclusión (coincide con backend)
+  const getStandardizedStatus = (r: any) => {
+    const s = (r.manualReviewStatus || r.manual_review_status || r.status || r.screeningStatus || r.screening_status || '').toLowerCase()
+    if (s.includes('included') || s === 'include') return 'included'
+    if (s.includes('excluded') || s === 'exclude') return 'excluded'
+    return 'pending'
+  }
+
 
   useEffect(() => {
     if (screeningFinalized && activeTab === 'priorizacion') {
@@ -392,7 +405,7 @@ export default function ScreeningPage({ params }: { params: { id: string } }) {
 
     const matchesSearch = searchQuery === "" ||
       ref.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (Array.isArray(ref.authors) ? ref.authors.join(' ').toLowerCase().includes(searchQuery.toLowerCase()) : (ref.authors || '').toLowerCase().includes(searchQuery.toLowerCase()))
+      (Array.isArray(ref.authors) ? ref.authors.join(' ').toLowerCase().includes(searchQuery.toLowerCase()) : (ref.authors as string || '').toLowerCase().includes(searchQuery.toLowerCase()))
 
     return matchesStatus && matchesMethod && matchesSearch
   })
@@ -466,16 +479,16 @@ export default function ScreeningPage({ params }: { params: { id: string } }) {
                     classifiedReferences: {
                       highConfidenceInclude: references.filter(r => 
                         ((r as any).screeningScore > 0.15 && !r.aiReasoning?.toLowerCase().includes('chatgpt')) || 
-                        (r.status === 'included' && !r.aiReasoning?.toLowerCase().includes('chatgpt'))
+                        (getStandardizedStatus(r) === 'included' && !r.aiReasoning?.toLowerCase().includes('chatgpt'))
                       ),
                       highConfidenceExclude: references.filter(r => 
-                        ((r as any).screeningScore < 0.10 && !r.aiReasoning?.toLowerCase().includes('chatgpt') && r.status !== 'included')
+                        ((r as any).screeningScore < 0.10 && !r.aiReasoning?.toLowerCase().includes('chatgpt') && getStandardizedStatus(r) !== 'included')
                       ),
                       complementaryRelevant: references.filter(r => 
-                        (r.aiClassification === 'include' || r.status === 'included') && r.aiReasoning?.toLowerCase().includes('chatgpt')
+                        (r.aiClassification === 'include' || getStandardizedStatus(r) === 'included') && r.aiReasoning?.toLowerCase().includes('chatgpt')
                       ),
                       complementaryNotRelevant: references.filter(r => 
-                        r.aiClassification === 'exclude' && r.aiReasoning?.toLowerCase().includes('chatgpt') && r.status !== 'included'
+                        r.aiClassification === 'exclude' && r.aiReasoning?.toLowerCase().includes('chatgpt') && getStandardizedStatus(r) !== 'included'
                       )
                     }
                   }}
@@ -503,9 +516,9 @@ export default function ScreeningPage({ params }: { params: { id: string } }) {
                 const totalRefs = references.length
                 const classifiedRefs = references.filter(r => r.aiClassification)
                 const selectedForReview = references.filter(r => selectedForFullText.has(r.id))
-                const excludedManual = selectedForReview.filter(r => r.manualReviewStatus === 'excluded')
-                const includedRefs = selectedForReview.filter(r => r.manualReviewStatus === 'included')
-                const pendingReview = selectedForReview.filter(r => !r.manualReviewStatus || r.manualReviewStatus === 'pending')
+                const excludedManual = selectedForReview.filter(r => getStandardizedStatus(r) === 'excluded')
+                const includedRefs = selectedForReview.filter(r => getStandardizedStatus(r) === 'included')
+                const pendingReview = selectedForReview.filter(r => getStandardizedStatus(r) === 'pending')
 
                 const dbCounts: Record<string, number> = {}
                 references.forEach(r => { dbCounts[r.source || 'Unknown'] = (dbCounts[r.source || 'Unknown'] || 0) + 1 })
@@ -547,8 +560,8 @@ export default function ScreeningPage({ params }: { params: { id: string } }) {
               {(() => {
                 const totalRefs = references.length
                 const selectedRefs = references.filter(r => selectedForFullText.has(r.id))
-                const includedRefs = selectedRefs.filter(r => r.manualReviewStatus === 'included')
-                const excludedManualRefs = selectedRefs.filter(r => r.manualReviewStatus === 'excluded')
+                const includedRefs = selectedRefs.filter(r => getStandardizedStatus(r) === 'included')
+                const excludedManualRefs = selectedRefs.filter(r => getStandardizedStatus(r) === 'excluded')
 
                 return (
                   <div className="grid gap-6">

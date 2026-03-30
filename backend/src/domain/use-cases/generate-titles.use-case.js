@@ -168,9 +168,13 @@ REGLAS DE REDACCIÓN ACADÉMICA PARA TÍTULOS (ESTRICTO)
    - **Patrón C2**: "[Outcome Paraguas] Impact of [Intervention] Versus [Comparator] in [Population]: A Systematic Literature Review"
    - **Patrón A** (Si no hay Comparator): "[Sustantivo de Acción Académica] of [Intervention] on [Outcome] in [Population]: A Systematic Literature Review"
 
-6. **Prohibiciones Totales**:
+6. **Extensión Eficiente y Prohibiciones Totales**:
+   - Cada título debe tener entre 15 y 22 palabras (máximo 200 caracteres).
+   - Evita el "ruido" léxico.
    - Cero buzzwords ("Moderno", "Avanzado", "Reciente", "Estudio sobre").
-   - La extensión completa debe ser fluida, de 12 a 23 palabras.
+
+7. **Eliminación de Redundancias**:
+   - No utilices frases redundantes como "A Comparative Analysis of..." si usas la partícula "versus" o "vs.". Prioriza la síntesis.
 
 ═══════════════════════════════════════════════════════════════
 JUSTIFICACIÓN (30-50 palabras en español)
@@ -251,12 +255,15 @@ GENERA LOS 5 TÍTULOS AHORA:`;
         const title = item.title.trim();
         const wordCount = title.split(/\s+/).length;
         
-        // Validar longitud (5-22 palabras)
-        if (wordCount < 5) {
-          console.warn(`Título ${index + 1} muy corto (${wordCount} palabras): "${title.substring(0, 50)}..."`);
+        // Validar longitud (15-22 palabras, max 200 caracteres)
+        if (wordCount < 15) {
+          console.warn(`Título ${index + 1} muy corto (${wordCount} palabras, esperado min 15): "${title.substring(0, 50)}..."`);
         }
         if (wordCount > 22) {
-          console.warn(`Título ${index + 1} muy largo (${wordCount} palabras): "${title.substring(0, 50)}..."`);
+          console.warn(`Título ${index + 1} muy largo (${wordCount} palabras, esperado max 22): "${title.substring(0, 50)}..."`);
+        }
+        if (title.length > 200) {
+          console.warn(`Título ${index + 1} muy largo carácteres (${title.length} chars, esperado max 200): "${title.substring(0, 50)}..."`);
         }
         
         // Validar compliance

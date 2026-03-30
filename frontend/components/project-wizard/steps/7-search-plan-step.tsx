@@ -38,6 +38,8 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { apiClient } from "@/lib/api-client"
 import { ImportReferencesButton } from "@/components/screening/import-references-button"
+import { ManualReferenceDialog } from "./manual-reference-dialog"
+import { Plus } from "lucide-react"
 
 // Wrapper component para manejar la creación de proyecto temporal antes de la importación
 interface ImportReferencesWrapperProps {
@@ -80,66 +82,152 @@ function ImportReferencesWrapper({
   }
 
   const projectId = data.projectId
+  const [showManualDialog, setShowManualDialog] = useState(false)
+
+  const handleManualSuccess = (count: number) => {
+    // Actualizar contador local usando clave compuesta databaseId + block
+    const countKey = query.block ? `${query.databaseId}_${query.block}` : query.databaseId;
+    setImportedCounts((prev: any) => ({
+      ...prev,
+      [countKey]: (prev[countKey] || 0) + count
+    }))
+
+    // Agregar a uploadedFiles para que el sistema sepa que hay datos
+    const manualEntry = {
+      filename: `manual_entry_${query.databaseName}.csv`,
+      format: 'manual',
+      recordCount: count,
+      uploadedAt: new Date().toISOString(),
+      databaseId: query.databaseId,
+      databaseName: query.databaseName,
+      data: []
+    }
+
+    updateData({
+      searchPlan: {
+        ...data.searchPlan,
+        uploadedFiles: [
+          ...(data.searchPlan?.uploadedFiles || []),
+          manualEntry
+        ]
+      }
+    })
+  }
 
   return (
     <div className="text-center">
       {projectId ? (
-        <ImportReferencesButton
-          projectId={projectId}
-          size="sm"
-          showLabel={true}
-          onImportSuccess={(count: number, fileInfo?: any) => {
-            // Actualizar contador local usando clave compuesta databaseId + block
-            const countKey = query.block ? `${query.databaseId}_${query.block}` : query.databaseId;
-            setImportedCounts((prev: any) => ({
-              ...prev,
-              [countKey]: (prev[countKey] || 0) + count
-            }))
+        <>
+          <ImportReferencesButton
+            projectId={projectId}
+            size="sm"
+            showLabel={true}
+            onImportSuccess={(count: number, fileInfo?: any) => {
+              // Actualizar contador local usando clave compuesta databaseId + block
+              const countKey = query.block ? `${query.databaseId}_${query.block}` : query.databaseId;
+              setImportedCounts((prev: any) => ({
+                ...prev,
+                [countKey]: (prev[countKey] || 0) + count
+              }))
 
-            // Actualizar uploadedFiles en el context
-            const newUploadedFile = {
-              filename: fileInfo?.filename || `import_${query.databaseName}.csv`,
-              format: fileInfo?.format || 'csv',
-              recordCount: count,
-              uploadedAt: new Date().toISOString(),
-              databaseId: query.databaseId,
-              databaseName: query.databaseName,
-              data: []
-            }
-
-            updateData({
-              searchPlan: {
-                ...data.searchPlan,
-                uploadedFiles: [
-                  ...(data.searchPlan?.uploadedFiles || []),
-                  newUploadedFile
-                ]
+              // Actualizar uploadedFiles en el context
+              const newUploadedFile = {
+                filename: fileInfo?.filename || `import_${query.databaseName}.csv`,
+                format: fileInfo?.format || 'csv',
+                recordCount: count,
+                uploadedAt: new Date().toISOString(),
+                databaseId: query.databaseId,
+                databaseName: query.databaseName,
+                data: []
               }
-            })
 
-            toast({
-              title: "✅ Referencias importadas",
-              description: `${count} referencias cargadas de ${query.databaseName}`
-            })
-          }}
-        />
+              updateData({
+                searchPlan: {
+                  ...data.searchPlan,
+                  uploadedFiles: [
+                    ...(data.searchPlan?.uploadedFiles || []),
+                    newUploadedFile
+                  ]
+                }
+              })
+
+              toast({
+                title: "✅ Referencias importadas",
+                description: `${count} referencias cargadas de ${query.databaseName}`
+              })
+            }}
+          />
+          
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={(e) => {
+              e.preventDefault()
+              setShowManualDialog(true)
+            }}
+            className="w-full text-[10px] h-7 mt-2"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            Manual
+          </Button>
+
+          <ManualReferenceDialog
+            projectId={projectId}
+            databaseId={query.databaseId}
+            databaseName={query.databaseName}
+            open={showManualDialog}
+            onOpenChange={setShowManualDialog}
+            onSuccess={handleManualSuccess}
+          />
+        </>
       ) : (
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={isCreatingProject}
-          onClick={async (e) => {
-            e.preventDefault()
-            await handleImportClick()
-          }}
-        >
-          {isCreatingProject ? (
-            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-          ) : (
-            <Upload className="h-3 w-3 mr-1" />
+        <div className="flex flex-col gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isCreatingProject}
+            onClick={async (e) => {
+              e.preventDefault()
+              await handleImportClick()
+            }}
+            className="w-full"
+          >
+            {isCreatingProject ? (
+              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+            ) : (
+              <Upload className="h-3 w-3 mr-1" />
+            )}
+            Cargar
+          </Button>
+          
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={isCreatingProject}
+            onClick={async (e) => {
+              e.preventDefault()
+              if (!projectId) {
+                await handleImportClick()
+              }
+              setShowManualDialog(true)
+            }}
+            className="w-full text-[10px] h-7"
+          >
+            <Plus className="h-3 w-3 mr-1" />
+            Manual
+          </Button>
+
+          {projectId && (
+            <ManualReferenceDialog
+              projectId={projectId}
+              databaseId={query.databaseId}
+              databaseName={query.databaseName}
+              open={showManualDialog}
+              onOpenChange={setShowManualDialog}
+              onSuccess={handleManualSuccess}
+            />
           )}
-          {isCreatingProject ? 'Preparando...' : 'Importar Referencias'}
-        </Button>
+        </div>
       )}
       {(() => {
         const countKey = query.block ? `${query.databaseId}_${query.block}` : query.databaseId;

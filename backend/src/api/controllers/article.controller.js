@@ -11,6 +11,7 @@ const GenerateArticleFromTemplateUseCase = require('../../domain/use-cases/gener
 const GeneratePrismaContextUseCase = require('../../domain/use-cases/generate-prisma-context.use-case');
 const ExtractRQSDataUseCase = require('../../domain/use-cases/extract-rqs-data.use-case');
 const ExtractFullTextDataUseCase = require('../../domain/use-cases/extract-fulltext-data.use-case');
+const ValidateLatexUseCase = require('../../domain/use-cases/validate-latex.use-case');
 const AIService = require('../../infrastructure/services/ai.service');
 const ArticleVersion = require('../../domain/models/article-version.model');
 const latexTemplate = require('../../../templates/article-latex.template');
@@ -553,11 +554,22 @@ class ArticleController {
       // Generar LaTeX
       const latexContent = latexTemplate.generate(article, userProfile);
 
+      // Validar LaTeX (Compilar y verificar)
+      const validateUseCase = new ValidateLatexUseCase();
+      const springerProject = latexTemplate.generateSpringerProject(article, userProfile);
+      const validationResult = await validateUseCase.execute(springerProject, 'main.tex');
+
+      let finalLatexContent = latexContent;
+      if (validationResult.issues && validationResult.issues.length > 0) {
+        const commentReport = validationResult.reportText.split('\n').map(l => `% ${l}`).join('\n');
+        finalLatexContent = `% ==========================================\n${commentReport}\n% ==========================================\n\n${latexContent}`;
+      }
+
       // Configurar headers para descarga
       const filename = `article_${projectId.substring(0, 8)}.tex`;
       res.setHeader('Content-Type', 'application/x-latex');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.send(latexContent);
+      res.send(finalLatexContent);
 
     } catch (error) {
       console.error('❌ Error exportando LaTeX:', error);
@@ -897,10 +909,20 @@ You can modify:
 
       archive.pipe(res);
 
-      // 1. LaTeX
+      // 1. LaTeX Project (Springer structured)
       const userProfile = { email: req.user?.email, fullName: req.user?.fullName };
-      const latexContent = latexTemplate.generate(article, userProfile);
-      archive.append(latexContent, { name: 'article.tex' });
+      const springerProject = latexTemplate.generateSpringerProject(article, userProfile);
+      
+      // Validar LaTeX
+      const validateUseCase = new ValidateLatexUseCase();
+      const validationResult = await validateUseCase.execute(springerProject, 'main.tex');
+      if (validationResult.reportText) {
+        archive.append(validationResult.reportText, { name: 'validation_report.txt' });
+      }
+
+      Object.keys(springerProject).forEach(filepath => {
+        archive.append(springerProject[filepath], { name: filepath });
+      });
 
       // 2. BibTeX
       if (rqsEntries.length > 0) {

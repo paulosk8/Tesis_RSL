@@ -370,11 +370,13 @@ class ImportReferencesUseCase {
       result.missingRequired.push('revista/conferencia');
     }
 
-    // 5. DOI - identificador único, permite localizar el artículo original
+    // 5. DOI - identificador único (NUEVO: Opcional, solo warning)
     const doi = refData.doi?.trim();
     if (!doi) {
-      result.isValid = false;
-      result.missingRequired.push('DOI');
+      result.warnings.push({ 
+        field: 'doi', 
+        message: 'Sin DOI - El DOI es el identificador único recomendado. Sin él, es más difícil identificar duplicados automáticamente.' 
+      });
     }
 
     // ═══ CAMPO CRÍTICO PARA IA (warning, no bloquea) ═══

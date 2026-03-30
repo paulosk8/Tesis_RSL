@@ -11,7 +11,6 @@ import { AIGeneratorPanel } from "@/components/article/ai-generator-panel"
 import { ArticleStats } from "@/components/article/article-stats"
 import { PrismaPreviewDialog } from "@/components/article/prisma-preview-dialog"
 import { ExportPanel } from "@/components/article/export-panel"
-import { JournalTemplatePanel } from "@/components/article/journal-template-panel"
 import type { ArticleVersion } from "@/lib/article-types"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -21,6 +20,7 @@ import { Save, FileDown, Loader2, Sparkles, FileText, ExternalLink } from "lucid
 import { useToast } from "@/hooks/use-toast"
 import { useAuth } from "@/lib/auth-context"
 import { useRouter } from "next/navigation"
+import Link from "next/link"
 
 interface ArticleStatus {
   canGenerate: boolean
@@ -90,10 +90,16 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
         // Excluidos en fase título/abstract = total tras dedup - seleccionados para full-text
         const screenedOut = afterDedup - fullTextAssessed
 
-        // Usar manualReviewStatus para las decisiones de revisión manual
-        const getManualStatus = (r: any) => r.manualReviewStatus || r.manual_review_status || null
-        const included = selectedRefs.filter((r: any) => getManualStatus(r) === 'included').length
-        const excludedFT = selectedRefs.filter((r: any) => getManualStatus(r) === 'excluded').length
+        // Usar lógica robusta para determinar inclusión/exclusión (coincide con backend Reference.isIncluded)
+        const getStandardizedStatus = (r: any) => {
+          const s = (r.manualReviewStatus || r.manual_review_status || r.status || r.screeningStatus || r.screening_status || '').toLowerCase()
+          if (s.includes('included') || s === 'include') return 'included'
+          if (s.includes('excluded') || s === 'exclude') return 'excluded'
+          return 'pending'
+        }
+        
+        const included = selectedRefs.filter((r: any) => getStandardizedStatus(r) === 'included').length
+        const excludedFT = selectedRefs.filter((r: any) => getStandardizedStatus(r) === 'excluded').length
 
         // Databases (filtrar Unknown)
         const dbMap: Record<string, number> = {}
@@ -107,7 +113,7 @@ export default function ArticlePage({ params }: { params: { id: string } }) {
 
         // Exclusion reasons de la revisión manual (full-text)
         const exclusionReasons: Record<string, number> = {}
-        selectedRefs.filter((r: any) => getManualStatus(r) === 'excluded').forEach((r: any) => {
+        selectedRefs.filter((r: any) => getStandardizedStatus(r) === 'excluded').forEach((r: any) => {
           if (r.exclusionReason || r.exclusion_reason) {
             const reason = (r.exclusionReason || r.exclusion_reason).trim()
             exclusionReasons[reason] = (exclusionReasons[reason] || 0) + 1
@@ -966,6 +972,18 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
                         basándote en tu protocolo y resultados de cribado.
                       </p>
                     </div>
+                    {status && !status.canGenerate && (
+                      <div className="p-4 bg-yellow-50 dark:bg-yellow-950/30 border border-yellow-200 dark:border-yellow-900/50 rounded-lg max-w-md text-center">
+                        <p className="text-sm text-yellow-800 dark:text-yellow-200 mb-3">
+                          <strong>Atención:</strong> Para generar el artículo, primero debes completar al 100% la lista de verificación PRISMA 2020.
+                        </p>
+                        <Button variant="outline" size="sm" asChild className="border-yellow-600/30 hover:bg-yellow-100 dark:hover:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300">
+                          <Link href={`/projects/${params.id}/prisma`}>
+                            Ir al Editor PRISMA
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
                     <Button
                       onClick={handleGenerateFullArticle}
                       disabled={isGenerating || !status?.canGenerate}
@@ -990,9 +1008,9 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
             </div>
           </div>
 
-          {/* Paneles de Salida (Exportación y Formato Personalizado) */}
+          {/* Panel de Salida (Exportación) */}
           {currentVersion && currentVersion.id !== 'v1-temp' && (
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="mt-8">
               <ExportPanel
                 projectId={params.id}
                 canExport={status?.canGenerate || false}
@@ -1000,7 +1018,6 @@ ${convertMarkdownToLatex(currentVersion.content.declarations)}
                 onRegenerate={handleGenerateFullArticle}
                 isRegenerating={isGenerating}
               />
-              <JournalTemplatePanel projectId={params.id} />
             </div>
           )}
         </div>

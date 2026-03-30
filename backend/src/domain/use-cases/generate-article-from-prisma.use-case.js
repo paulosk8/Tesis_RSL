@@ -274,9 +274,7 @@ ${text}`;
         try {
           // Obtener referencias incluidas
           const allReferences = await this.referenceRepository.findByProject(projectId);
-          const includedReferences = allReferences.filter(ref => 
-            ref.screeningStatus === 'included' || ref.screeningStatus === 'fulltext_included'
-          );
+          const includedReferences = allReferences.filter(ref => ref.isIncluded());
           
           const refsWithPDF = includedReferences.filter(ref => ref.fullTextUrl);
           
@@ -328,11 +326,44 @@ ${text}`;
         const allReferences = await this.referenceRepository.findByProject(projectId);
         const manuallyIncludedIds = new Set(
           allReferences
-            .filter(ref => ref.manualReviewStatus === 'included')
+            .filter(ref => ref.isIncluded())
             .map(ref => ref.id)
         );
         rqsEntries = rqsEntries.filter(entry => manuallyIncludedIds.has(entry.referenceId));
         console.log(`📌 Filtrados estrictamente por revisión manual: ${rqsEntries.length} estudios.`);
+      }
+
+      // ✅ VERIFICACIÓN DE FUENTES (Peer Review): Filtrar manuales metodológicos
+      console.log(`📌 Filtrando manuales metodológicos (ej. PRISMA Statement) del corpus técnico`);
+      const isMethodological = (entry) => {
+        const titleLower = (entry.title || '').toLowerCase();
+        const typeLower = (entry.studyType || '').toLowerCase();
+        return titleLower.includes('prisma 2020') || 
+               titleLower.includes('prisma statement') || 
+               titleLower.includes('preferred reporting items') || 
+               typeLower === 'methodology' || 
+               typeLower === 'guideline' || 
+               typeLower.includes('manual');
+      };
+      
+      const prevCount = rqsEntries.length;
+      rqsEntries = rqsEntries.filter(entry => !isMethodological(entry));
+      if (prevCount > rqsEntries.length) {
+          console.log(`  ℹ️  Se excluyeron ${prevCount - rqsEntries.length} manuales metodológicos (no cuentan para n).`);
+      }
+      
+      // ✅ VALIDACIÓN DE RANGO TEMPORAL (Peer Review)
+      if (rqsEntries.length > 0 && prismaContext.protocol.temporalRange) {
+        const years = rqsEntries.map(e => parseInt(e.year || 9999)).filter(y => y !== 9999);
+        if (years.length > 0) {
+            const minYearExtract = Math.min(...years);
+            const declaredStart = parseInt(prismaContext.protocol.temporalRange.start || 9999);
+            
+            if (declaredStart !== 9999 && minYearExtract > 0 && declaredStart > minYearExtract) {
+                console.warn(`⚠️ ALERTA ACADÉMICA: Protocolo declara inicio ${declaredStart}, pero hay estudios de ${minYearExtract}. Autocorrigiendo.`);
+                prismaContext.protocol.temporalRange.start = minYearExtract.toString();
+            }
+        }
       }
 
       // ✅ CORRECCIÓN: Re-clasificar estudios para RQs
@@ -564,12 +595,14 @@ ${Object.keys(rqsStats.rqRelations).map((rqKey, i) => {
   return `- ${rqKey.toUpperCase()} coverage: ${rel.yes} direct, ${rel.partial} partial`;
 }).join('\n')}
 
-Write ONE cohesive paragraph with FOUR clearly delineated sub-segments (no headings, no line breaks):
+Write ONE cohesive paragraph representing an absolutely DIRECT ABSTRACT following the structure Context → Gap → Method (AI + Manual) → Numerical Results → Conclusion (no headings, no line breaks):
 
-1. **Introduction segment** (2-3 sentences): Start directly with the technical conflict and software architecture principles. Avoid generic filler.
-2. **Methods segment** (3-4 sentences): Specify PRISMA 2020 compliance, databases, PICO, and the AI-assisted screening with embeddings/elbow method validation.
-3. **Results segment** (4-5 sentences): Report the final $n$ of included studies, distribution, and predominant technologies with exact technical metrics.
-4. **Discussion segment** (2-3 sentences): Synthesize implications for system design and architecture.
+1. **Context & Gap** (2-3 sentences): Start directly with the technical conflict and software architecture principles. Avoid ALL AI filler words (e.g., "crucial", "landscape", "pivotal", "fascinating"). State the gap clearly.
+2. **Method** (2-3 sentences): Specify PRISMA 2020 compliance, search range, and the Hybrid screening (AI embeddings + Manual review).
+3. **Numerical Results** (3-4 sentences): Report the exact final $n=${rqsStats.total}$ of included empirical studies, their distribution, and predominant technologies with SPECIFIC exact technical metrics.
+4. **Conclusion** (1-2 sentences): Synthesize implications for system design directly without redundant phrases.
+
+Additionally, weave the following keywords seamlessly into the text if possible to improve indexability: ${rqsStats.technologies.slice(0, 3).map(t => t.technology).join(', ')}.
 
 **QUALITY REQUIREMENTS:**
 - Use ONLY the data provided above, DO NOT invent figures
@@ -793,11 +826,11 @@ Generate ONLY the introduction text in English:`;
     ]);
     console.log('✅ Translation completed');
 
-    return `## 2.1 Study Design
+    return `## Study Design
 
 This systematic review was conducted following the PRISMA 2020 (Preferred Reporting Items for Systematic Reviews and Meta-Analyses) guidelines [1]. The protocol was defined a priori before initiating the bibliographic search, including predefined eligibility criteria based on the PICO framework, a structured search strategy, and a narrative synthesis plan.
 
-## 2.2 Eligibility Criteria
+## Eligibility Criteria
 
 ${eligibilityCriteria}
 
@@ -807,7 +840,7 @@ The criteria were defined following the PICO framework:
 - **Comparison (C)**: ${picoComparison}
 - **Outcome (O)**: ${picoOutcome}
 
-## 2.3 Information Sources and Search Strategy
+## Information Sources and Search Strategy
 
 The search focused on identifying relevant studies published between ${prismaContext.protocol.temporalRange.start || '2023'} and ${prismaContext.protocol.temporalRange.end || '2025'}. A total of ${databases.length} key academic databases in the field were selected: ${dbNames}. Following PRISMA standards, the initial search yielded a total of **${prismaContext.screening.totalResults || 0} registers**. The database-specific search strings and their respective hit counts are detailed in the search strategy summary below.
 
@@ -816,10 +849,10 @@ ${searchChart}
 The complete strategies for all databases are available in the supplementary material.
 
 
-The study selection process followed a standardized multi-phase approach as detailed in Section 2.5, prioritizing methodological rigor and minimizing reporting bias.
+The study selection process followed a standardized multi-phase approach as detailed in the selection process section, prioritizing methodological rigor and minimizing reporting bias.
 
 
-## 2.5 Selection Process
+## Selection Process
 
 ${selectionProcess}
 
@@ -829,7 +862,7 @@ The process followed four phases:
 3. **Title and abstract screening**: References prioritized by the AI system were evaluated by the principal investigator using the predefined PICO-based criteria. The AI classifications served as decision support, with the human reviewer making all final decisions.
 4. **Full-text review**: Articles that passed the initial screening were retrieved in full text and evaluated against the complete eligibility criteria, including assessment of methodological quality.
 
-## 2.6 Data Extraction Using the RQS Schema
+## Data Extraction Using the RQS Schema
 
 Data were extracted using a structured and standardized RQS (Research Question Schema) specifically designed for this review. The RQS schema included the following fields:
 
@@ -863,7 +896,7 @@ Data extraction was assisted by artificial intelligence (Claude Sonnet 4) to acc
 
 To ensure consistency, a pilot extraction was conducted with 3 studies before proceeding with the complete set. The extracted data were stored in a structured database compatible with statistical analysis.
 
-## 2.7 Risk of Bias Assessment
+## Risk of Bias Assessment
 
 ${riskOfBias}
 
@@ -873,7 +906,7 @@ A qualitative assessment of methodological quality was applied considering:
 - Sufficiency of data to answer the RQs
 - Explicit declaration of limitations
 
-## 2.8 Data Synthesis
+## Data Synthesis
 
 ${synthesisMethod}
 
@@ -921,7 +954,7 @@ The synthesis was organized around the three research questions, integrating fin
         
         const rel = rqsStats.rqRelations[`rq${i + 1}`] || { yes: 0, partial: 0 };
         
-        synthesisBlocks.push(`### 3.4.${i + 1} RQ${i + 1}: ${rqLabel}
+        synthesisBlocks.push(`### RQ${i + 1}: ${rqLabel}
 
 Of the ${rqsStats.total} included studies, **${rel.yes} studies** directly addressed this question, while **${rel.partial} additional studies** addressed it partially.
 
@@ -941,24 +974,24 @@ ${synthesis}`);
 
     let bubbleSection = '';
     if (enhancedChartData && enhancedChartData.hasBubbleData && charts.bubble_chart) {
-      bubbleSection = `\n### 3.4.4 Metrics and Technologies Mapping\n\n![Metrics vs Technologies Distribution](${charts.bubble_chart})\n*Figure 5. Distribution of reported metrics across different technologies. Bubble size represents the number of studies reporting each metric-technology combination.*\n`;
+      bubbleSection = `\n### Metrics and Technologies Mapping\n\n![Metrics vs Technologies Distribution](${charts.bubble_chart})\n*Figure 5. Distribution of reported metrics across different technologies. Bubble size represents the number of studies reporting each metric-technology combination.*\n`;
     }
 
     let keywordSection = '';
     if (enhancedChartData && enhancedChartData.hasKeywordData && charts.keyword_concentration) {
-      keywordSection = `\n### 3.4.6 Thematic Concentration Mapping\n\n![Technical Keyword Concentration](${charts.keyword_concentration})\n*Figure 4. Technical keyword concentration and thematic mapping. The frequency of terms reveals the core technological domains and architectural patterns addressed by the included studies. This distribution highlights the predominant focus areas in the current literature.*\n`;
+      keywordSection = `\n### Thematic Concentration Mapping\n\n![Technical Keyword Concentration](${charts.keyword_concentration})\n*Figure 4. Technical keyword concentration and thematic mapping. The frequency of terms reveals the core technological domains and architectural patterns addressed by the included studies. This distribution highlights the predominant focus areas in the current literature.*\n`;
     }
 
     let synthesisSection = '';
     if (enhancedChartData && enhancedChartData.hasSynthesisData) {
       const summaryTable = this.generateTechnicalSynthesisMarkdownTable(enhancedChartData.technical_synthesis.studies);
-      synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\n**TABLE ${this.toRoman(5)}**  \n**TECHNICAL PERFORMANCE SYNTHESIS MATRIX**\n\n${summaryTable}\n\n*Note: N/R indicates Not Reported.*\n`;
+      synthesisSection = `\n### Technical Performance Synthesis\n\n**TABLE ${this.toRoman(5)}**  \n**TECHNICAL PERFORMANCE SYNTHESIS MATRIX**\n\n${summaryTable}\n\n*Note: N/R indicates Not Reported.*\n`;
     } else if (enhancedChartData && !enhancedChartData.hasSynthesisData) {
-      synthesisSection = `\n### 3.4.5 Technical Performance Synthesis\n\nDirect quantitative comparison of technical performance could not be performed due to the lack of standardized metrics across the included studies.\n`;
+      synthesisSection = `\n### Technical Performance Synthesis\n\nDirect quantitative comparison of technical performance could not be performed due to the lack of standardized metrics across the included studies.\n`;
     }
 
     // Actualizar Títulos de Tablas y Figuras según IEEE (Tablas ARRIBA, Figuras ABAJO)
-    let resultsText = `## 3.1 Study Selection
+    let resultsText = `## Study Selection
 
 ${studySelection}
 
@@ -972,7 +1005,7 @@ During title and abstract screening, **${excludedTitleAbstract} records were exc
 
 ${charts.prisma ? `![PRISMA 2020 Flow Diagram](${charts.prisma})\n*Figure 1. PRISMA 2020 flow diagram.*` : ''}
 
-## 3.2 Characteristics of Included Studies
+## Characteristics of Included Studies
 
 ${rqsAnalysis || 'The included studies were analyzed using the RQS schema.'} 
 
@@ -982,7 +1015,7 @@ ${this.generateTable1Professional(rqsEntries)}
 
 ${charts.temporal_distribution ? `\n![Temporal Distribution](${charts.temporal_distribution})\n*Figure 3. Temporal distribution (${rqsStats.yearRange.min}-${rqsStats.yearRange.max}).*\n` : ''}
 
-## 3.3 Methodological Quality
+## Methodological Quality
 
 ${riskOfBiasResults}
 
@@ -992,7 +1025,7 @@ ${this.generateTable3Professional(rqsEntries)}
 
 ${charts.quality_assessment ? `\n![Quality Assessment](${charts.quality_assessment})\n*Figure 6. Methodological quality assessment results.*\n` : ''}
 
-## 3.4 Synthesis of Results by Research Question
+## Synthesis of Results by Research Question
 
 ${rqSyntheticFindings}
 
@@ -1017,28 +1050,41 @@ ${keywordSection}`;
   generateTechnicalSynthesisMarkdownTable(studiesArray) {
     if (!studiesArray || studiesArray.length === 0) return '';
     
-    // Extraer todas las columnas únicas de todos los estudios
-    const allColsSet = new Set(['study', 'tool']);
+    // Extraer todas las columnas únicas y contar frecuencias para priorizar métricas relevantes
+    const colFrequency = {};
     studiesArray.forEach(study => {
       Object.keys(study).forEach(k => {
         if (k !== 'study' && k !== 'tool' && study[k] !== null && study[k] !== undefined && study[k] !== '') {
-          allColsSet.add(k);
+          colFrequency[k] = (colFrequency[k] || 0) + 1;
         }
       });
     });
     
-    const displayCols = Array.from(allColsSet);
+    // Sort columns by frequency (descending) and take top 3 methodology constraint for extreme readability
+    const sortedCols = Object.keys(colFrequency).sort((a, b) => colFrequency[b] - colFrequency[a]);
+    const topMetrics = sortedCols.slice(0, 3);
+    const displayCols = ['study', 'tool', ...topMetrics];
+    
+    // Cap studies natively to Top 10 according to SLR methodology for large datasets
+    let tableNote = '';
+    let displayStudies = studiesArray;
+    if (displayStudies.length > 10) {
+      displayStudies = displayStudies.slice(0, 10);
+      tableNote = '\\n*Note: Table truncated to display the top 10 most relevant studies and the top 3 primary metrics. N/R indicates Not Reported.*\\n';
+    } else {
+      tableNote = '\\n*Note: N/R indicates Not Reported.*\\n';
+    }
     
     // Formatear cabeceras
     const headerRow = displayCols.map(col => {
       if (col === 'study') return 'Study';
       if (col === 'tool') return 'Tool';
-      return col.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      return col.replace(/_/g, ' ').replace(/\\b\\w/g, c => c.toUpperCase());
     }).join(' | ');
     
     const separatorRow = displayCols.map(() => '---').join(' | ');
     
-    const dataRows = studiesArray.map((study, idx) => {
+    const dataRows = displayStudies.map((study, idx) => {
       return displayCols.map(col => {
          const val = study[col];
          if (col === 'study') {
@@ -1047,11 +1093,11 @@ ${keywordSection}`;
            return `${authorText} [${idx + 1}]`;
          }
          if (val === null || val === undefined || val === '') return 'N/R';
-         return `${val}`.replace(/\|/g, '-'); // Evitar romper markdown
+         return `${val}`.replace(/\\|/g, '-').substring(0, 60); // Evitar romper markdown y limitar texto extramadamente largo
       }).join(' | ');
-    }).join('\n');
+    }).join('\\n');
     
-    return `| ${headerRow} |\n| ${separatorRow} |\n| ${dataRows} |\n\n`;
+    return `| ${headerRow} |\\n| ${separatorRow} |\\n| ${dataRows} |\\n${tableNote}`;
   }
 
   /**
@@ -1114,7 +1160,7 @@ Respond ONLY with the analysis paragraphs in English:`;
       aiOptions
     );
 
-    return `### 3.2.1 Descriptive analysis based on RQS data
+    return `### Descriptive analysis based on RQS data
 
 ${response}`;
   }
@@ -1343,11 +1389,11 @@ ${prismaMapping.discussion.interpretation}
 - Highlight most significant or surprising findings
 - Compare observed distributions (types, contexts, technologies)
 
-**Paragraphs 3-4 (Comparison with previous studies):**
-- Compare results with existing literature in the field
-- Identify where this review agrees or disagrees with prior systematic reviews or primary studies
-- Discuss possible explanations for any contradictions
-- Reference specific included studies using [N] citations
+**Paragraphs 3-4 (Cross-citation of Technical Findings):**
+- EVERY time a technical finding, metric, or architectural observation is mentioned, you MUST include the citation bracket [N] corresponding to the author (e.g., "[2] demonstrated an overhead reduction...").
+- ZERO ROLE HALLUCINATION: accurately describe the study based on its assigned type (e.g., do not call a "Case Study" a "Systematic Review"; do not mix up benchmark experimental setups).
+- Compare results, identifying agreements or contradictions between the included empirical studies.
+- Reference specific included studies using strictly their [N] citations.
 
 **Paragraph 5 (Implications):**
 - Implications for professional practice
@@ -1360,13 +1406,13 @@ ${prismaMapping.discussion.interpretation}
 - Rigorous selection process
 
 **Paragraphs 7-8 (Threats to Validity — MANDATORY subsection):**
-This subsection MUST be explicitly labeled and address:
+This subsection MUST be explicitly labeled and address with absolute scientific honesty:
 - **Publication bias**: Only peer-reviewed studies from academic databases were included; grey literature and negative results may be missing.
 - **Language bias**: Restriction to specific languages may exclude relevant studies from certain regions.
 - **Database coverage**: Limited to ${prismaContext.protocol.databases.map(db => db.name || db).join(', ')}; other databases (e.g., Web of Science, PubMed) were not included which may affect coverage.
-- **Small sample size**: Only ${rqsStats.total} studies met inclusion criteria, limiting generalizability.
-- **AI-assisted screening**: While the elbow method provides a data-driven threshold, the AI model's semantic similarity scores may still introduce subtle biases in prioritization order.
-- **Heterogeneity**: Methodological diversity prevented quantitative meta-analysis.
+- **Sample Size and Generalizability**: Address the limitation of having a sample size of exactly n=${rqsStats.total} studies, and how this restricts statistical power and broad generalizability.
+- **AI-assisted screening**: While the elbow method provides a data-driven threshold, the AI model's semantic similarity scores may still introduce subtle biases.
+- **Heterogeneity of Testing Environments**: Highlight how the diversity and heterogeneity of the testing environments and metrics across the selected studies prevented a direct comparative quantitative meta-analysis.
 - **Temporal limitation**: Search restricted to ${rqsStats.yearRange.min}-${rqsStats.yearRange.max}.
 
 Format as: "### Threats to Validity" followed by continuous prose discussing each threat.
@@ -1431,7 +1477,7 @@ ${Object.keys(rqsStats.rqRelations).map((rqKey, i) => {
 
 The Conclusions section must be structured as direct answers to the research questions, followed by contribution, practice implications, and future work. This structure ensures maximum value for the reader.
 
-**4.1 Answers to Research Questions (150-200 words)**
+**Answers to Research Questions (150-200 words)**
 For EACH research question, provide a direct, quantitative answer. Use this structure:
 
 "${Object.keys(rqsStats.rqRelations).map((rqKey, i) => {
@@ -1439,12 +1485,12 @@ For EACH research question, provide a direct, quantitative answer. Use this stru
   return `**${rqKey.toUpperCase()} Answer**: [Clear answer with key findings and numbers]. Of the ${rqsStats.total} included studies, ${rel.yes + rel.partial} addressed this question, revealing that [main finding with specific data/technology/metric].`;
 }).join('\n\n')}"
 
-**4.2 Principal Contribution (100-150 words)**
+**Principal Contribution (100-150 words)**
 State the single most significant technical finding from this review. Use this structure:
 
 "The primary contribution of this systematic review is [specific finding]. This was evidenced by [quantitative data from multiple studies]. Among the ${rqsStats.technologies.length} technologies analyzed, [most prominent technology] demonstrated [specific advantage/characteristic with metrics if available]."
 
-**4.3 Implications for Practice (150-200 words)**
+**Implications for Practice (150-200 words)**
 Provide 3-4 actionable recommendations for practitioners (software engineers, architects, researchers). Use numbered list:
 
 "Based on the synthesized evidence, the following practical implications emerge:
@@ -1454,7 +1500,7 @@ Provide 3-4 actionable recommendations for practitioners (software engineers, ar
 3. **[Recommendation 3]**: [Brief explanation based on findings]
 4. **[Recommendation 4]** (if applicable): [Brief explanation]"
 
-**4.4 Research Gaps and Future Directions (150-200 words)**
+**Research Gaps and Future Directions (150-200 words)**
 Identify 3-4 specific research gaps discovered through analysis (reference the temporal distribution in Figure 3 showing concentration/gaps, bubble chart in Figure 5 showing under-researched areas). Use numbered list:
 
 "This review identified several research gaps warranting future investigation:
@@ -1464,14 +1510,14 @@ Identify 3-4 specific research gaps discovered through analysis (reference the t
 3. **[Gap 3]**: [Why it matters and what should be studied]
 4. **[Gap 4]** (if applicable): [Why it matters]"
 
-**4.5 Final Statement (50-100 words)**
+**Final Statement (50-100 words)**
 Close with a statement about:
 - The contribution of this review to the body of knowledge
 - How it advances the field
 - Its value for both researchers and practitioners
 
 **CRITICAL REQUIREMENTS:**
-- Use the EXACT section headers: 4.1, 4.2, 4.3, 4.4, 4.5
+- Use the EXACT section headers WITHOUT numbering: Answers to Research Questions, Principal Contribution, Implications for Practice, Research Gaps and Future Directions, Final Statement
 - Total length: 500-800 words (exceeds previous 150-300 to meet Q1 journal standards)
 - Include ALL quantitative data provided above (numbers of studies, technologies, percentages)
 - DO NOT invent data, studies, or findings not mentioned

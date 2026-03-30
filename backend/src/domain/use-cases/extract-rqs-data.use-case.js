@@ -40,10 +40,7 @@ class ExtractRQSDataUseCase {
 
       // 2. Obtener referencias incluidas
       const references = await this.referenceRepository.findByProject(projectId);
-      const includedReferences = references.filter(ref => 
-        ref.screeningStatus === 'included' || 
-        ref.screeningStatus === 'fulltext_included'
-      );
+      const includedReferences = references.filter(ref => ref.isIncluded());
 
       if (includedReferences.length === 0) {
         return {

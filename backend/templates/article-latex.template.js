@@ -54,6 +54,7 @@ function generate(articleData, userProfile = null) {
 \\usepackage{hyperref}
 \\usepackage{cite}
 \\usepackage{caption}
+\\usepackage{rotating}
 
 \\hypersetup{
   colorlinks=true,
@@ -92,7 +93,7 @@ ${generateUniversalKeywords(articleData.keywords || [])}
 % 📏 800-1000 palabras
 % 📌 Estructura: Contextualización → Importancia → Vacíos → Estado actual → Justificación → Objetivos
 % 📌 DEBE terminar con lista explícita de Research Questions (RQ1, RQ2, RQ3)
-\\section{INTRODUCCIÓN}
+\\section{INTRODUCTION}
 
 % CONTEXTUALIZACIÓN GENERAL DEL TEMA
 ${convertMarkdownToLatex(articleData.introduction || `[Tu contexto general sobre el tema de investigación]
@@ -121,23 +122,23 @@ Los objetivos específicos son:
     \\item [Objetivo específico 1]
     \\item [Objetivo específico 2]
     \\item [Objetivo específico 3]
-\\end{itemize}`)}
+\\end{itemize}`, 'ieee')}
 
 % -------------------- 2. METHODOLOGÍA --------------------
 % 📌 Sección PRISMA 2020 compliant con estructura clara
 \\section{METODOLOGÍA}
 
-\\subsection{Tipo de estudio}
-El presente trabajo corresponde a una revisión sistemática de la literatura, desarrollada conforme a las directrices establecidas en la guía PRISMA 2020, con el propósito de garantizar un proceso estructurado, transparente y reproducible.
+\\subsection{Study Design}
+This work corresponds to a systematic literature review developed according to the PRISMA 2020 guidelines, aiming to guarantee a structured, transparent, and reproducible process.
 
-\\subsection{Estrategia de búsqueda}
+\\subsection{Search Strategy}
 La búsqueda sistemática de literatura científica se realizó en las siguientes bases de datos académicas:
 
 ${generateMethodsSection(articleData.methods || '')}
 
 % -------------------- 3. RESULTADOS --------------------
 % 📌 PRISMA diagram + Caracterización + Análisis RQS + Síntesis
-\\section{RESULTADOS}
+\\section{RESULTS}
 
 ${generateResultsSection(articleData.results || '')}
 
@@ -145,7 +146,7 @@ ${generateResultsSection(articleData.results || '')}
 % 📏 800-1200 palabras — Interpretación crítica, comparación con literatura, implicaciones
 % 📌 DEBE incluir subsección "Threats to Validity" (sesgo publicación, BD, IA, idioma)
 % 📌 NO repetir resultados, NO tablas nuevas
-\\section{DISCUSIÓN}
+\\section{DISCUSSION}
 
 ${convertMarkdownToLatex(articleData.discussion || `Los hallazgos de esta revisión sistemática revelan [describe interpretación de hallazgos principales].
 
@@ -155,11 +156,11 @@ Las implicaciones prácticas de estos resultados incluyen [describir aplicabilid
 
 Desde una perspectiva teórica, estos hallazgos [describir contribución al conocimiento]. La [tendencia/patrón observado] sugiere que [interpretación teórica], lo cual [relevancia para la teoría/campo de estudio].
 
-Es importante considerar que [contexto o matices que afectan la interpretación]. Además, [mencionar factores que puedan explicar variabilidad en hallazgos].`)}
+Es importante considerar que [contexto o matices que afectan la interpretación]. Además, [mencionar factores que puedan explicar variabilidad en hallazgos].`, 'ieee')}
 
 % -------------------- 5. LIMITACIONES --------------------
 % 📌 Reconocer debilidades metodológicas, sesgos potenciales, restricciones
-\\section{LIMITACIONES}
+\\section{LIMITATIONS}
 
 ${convertMarkdownToLatex(articleData.limitations || `Esta revisión sistemática presenta las siguientes limitaciones que deben considerarse al interpretar los hallazgos:
 
@@ -175,12 +176,12 @@ ${convertMarkdownToLatex(articleData.limitations || `Esta revisión sistemática
     \\item \\textbf{Sesgo de selección:} A pesar del uso de IA para priorización, el proceso de cribado humano puede estar sujeto a interpretación subjetiva de criterios de inclusión/exclusión.
 \\end{itemize}
 
-Estas limitaciones sugieren que los resultados deben interpretarse con cautela y considerarse como una síntesis del estado actual del conocimiento, sujeta a refinamiento conforme nueva evidencia esté disponible.`)}
+Estas limitaciones sugieren que los resultados deben interpretarse con cautela y considerarse como una síntesis del estado actual del conocimiento, sujeta a refinamiento conforme nueva evidencia esté disponible.`, 'ieee')}
 
 % -------------------- 6. CONCLUSIONES Y LÍNEAS FUTURAS --------------------
 % 📏 Síntesis concisa + Recomendaciones + Direcciones futuras
 % 📌 Responde: ¿Qué se aprendió? ¿Qué implicaciones tiene? ¿Qué falta investigar?
-\\section{CONCLUSIONES Y LÍNEAS FUTURAS}
+\\section{CONCLUSIONS AND FUTURE WORK}
 
 ${convertMarkdownToLatex(articleData.conclusions || `Esta revisión sistemática, desarrollada conforme a las directrices PRISMA 2020, permitió alcanzar los siguientes hallazgos principales:
 
@@ -206,7 +207,7 @@ Considerando las limitaciones identificadas y los vacíos detectados en la liter
     \\item Replicar revisiones sistemáticas incluyendo literatura gris y estudios en [idiomas adicionales].
 \\end{itemize}
 
-En conclusión, esta revisión contribuye a [describir aporte al campo] y establece una base sólida para futuras investigaciones en [tema principal].`)}
+En conclusión, esta revisión contribuye a [describir aporte al campo] y establece una base sólida para futuras investigaciones en [tema principal].`, 'ieee')}
 
 % -------------------- DECLARATIONS --------------------
 % ⚠️ Opcional: Se puede omitir si el journal no lo requiere
@@ -217,7 +218,7 @@ Esta investigación no recibió financiamiento externo.
 Los autores declaran no tener conflictos de intereses.
 
 \\section*{Registro del protocolo}
-${convertMarkdownToLatex(articleData.declarations || 'El protocolo de esta revisión no fue registrado previamente en plataformas de registro internacional.')}
+${convertMarkdownToLatex(articleData.declarations || 'El protocolo de esta revisión no fue registrado previamente en plataformas de registro internacional.', 'ieee')}
 
 \\section*{Disponibilidad de datos}
 Los datos están disponibles previa solicitud razonable al autor de correspondencia.
@@ -264,10 +265,10 @@ function generateAuthors(authors) {
  * Genera sección de Methods con estructura PRISMA 2020
  * Incluye gráfico de codo si está disponible en la ubicación correcta
  */
-function generateMethodsSection(methodsContent, includeElbowPlot = true) {
+function generateMethodsSection(methodsContent, includeElbowPlot = true, format = 'ieee') {
   // Si hay contenido markdown, convertirlo
   if (methodsContent && typeof methodsContent === 'string') {
-    let latex = convertMarkdownToLatex(methodsContent);
+    let latex = convertMarkdownToLatex(methodsContent, format);
     
     // Si el contenido no incluye el gráfico de codo y debe incluirlo, agregarlo antes de Data Extraction
     if (includeElbowPlot && !latex.includes('elbow') && !latex.includes('codo')) {
@@ -297,74 +298,74 @@ Se utilizó un enfoque híbrido de cribado asistido por IA. Las referencias desc
 
   // Estructura PRISMA 2020 compliant con subsecciones 2.3-2.7 según estructura académica
   return `
-\\subsection{Criterios de inclusión y exclusión}
+\\subsection{Inclusion and Exclusion Criteria}
 
 % ---- CRITERIOS DE INCLUSIÓN ----
-Los estudios incluidos en la revisión debían cumplir los siguientes criterios:
+The studies included in the review had to meet the following criteria:
 
 \\begin{itemize}
-    \\item \\textbf{Criterio de inclusión 1:} [Describe criterio específico]
-    \\item \\textbf{Criterio de inclusión 2:} [Describe criterio específico]
-    \\item \\textbf{Criterio de inclusión 3:} [Describe criterio específico]
-    \\item \\textbf{Criterio de inclusión 4:} [Describe criterio específico]
+    \\item \\textbf{Inclusion Criterion 1:} [Describe specific criterion]
+    \\item \\textbf{Inclusion Criterion 2:} [Describe specific criterion]
+    \\item \\textbf{Inclusion Criterion 3:} [Describe specific criterion]
+    \\item \\textbf{Inclusion Criterion 4:} [Describe specific criterion]
 \\end{itemize}
 
 % ---- CRITERIOS DE EXCLUSIÓN ----
-Paralelamente, los criterios de exclusión fueron:
+Conversely, the exclusion criteria were:
 
 \\begin{itemize}
-    \\item \\textbf{Criterio de exclusión 1:} [Describe criterio específico]
-    \\item \\textbf{Criterio de exclusión 2:} [Describe criterio específico]
-    \\item \\textbf{Criterio de exclusión 3:} [Describe criterio específico]
+    \\item \\textbf{Exclusion Criterion 1:} [Describe specific criterion]
+    \\item \\textbf{Exclusion Criterion 2:} [Describe specific criterion]
+    \\item \\textbf{Exclusion Criterion 3:} [Describe specific criterion]
 \\end{itemize}
 
-\\subsection{Priorización mediante Inteligencia Artificial}
+\\subsection{AI-assisted Prioritization}
 
-Con el propósito de optimizar el proceso de cribado y reducir el esfuerzo manual, se implementó un enfoque híbrido que combina análisis semántico asistido por IA con revisión humana experta.
+In order to optimize the screening process and reduce manual effort, a hybrid approach combining semantic analysis assisted by AI with expert human review was implemented.
 
-Las referencias obtenidas de las bases de datos fueron procesadas mediante un modelo de similitud semántica que asigna un puntaje de relevancia en el rango [0, 1], donde valores cercanos a 1 indican alta relevancia con respecto a los criterios de inclusión definidos.
+The references obtained from the databases were processed using a semantic similarity model that assigns a relevance score in the range [0, 1], where values close to 1 indicate high relevance with respect to the defined inclusion criteria.
 
-La Figura~\\ref{fig:codo} presenta la distribución de estos puntajes ordenados de mayor a menor (curva de scree plot), permitiendo identificar el punto de inflexión (\\textit{knee point}) óptimo que equilibra la maximización de estudios relevantes recuperados y la minimización del volumen de referencias a revisar manualmente.
+Figure~\\ref{fig:codo} presents the distribution of these scores sorted in descending order (scree plot curve), allowing the identification of the optimal knee point that balances maximizing retrieved relevant studies and minimizing the volume of references for manual review.
 
 \\begin{figure}[!htbp]
 \\centering
 \\includegraphics[width=\\linewidth]{scree_plot}
-\\caption{Scree plot: distribución de puntajes de relevancia semántica ordenados decrecientemente. La línea vertical roja señala el punto de inflexión utilizado como umbral de corte para priorizar la revisión manual.}
+\\caption{Scree plot: distribution of semantic relevance scores sorted decreasingly. The red vertical line points to the knee point used as the cut-off threshold to prioritize manual review.}
 \\label{fig:codo}
 \\end{figure}
 
-Este enfoque permitió priorizar los estudios con mayor probabilidad de cumplir los criterios de elegibilidad, incrementando la eficiencia del proceso de cribado sin comprometer la exhaustividad de la revisión.
+This approach allowed prioritizing the studies most likely to meet the eligibility criteria, increasing the efficiency of the screening process without compromising the comprehensiveness of the review.
 
-\\subsection{Extracción de datos}
+\\subsection{Data Extraction}
 
-La extracción de datos se realizó utilizando un formulario estructurado diseñado específicamente para capturar información relevante de los estudios incluidos. Los datos extraídos comprendieron:
-
-\\begin{itemize}
-    \\item \\textbf{Características generales:} autor(es), año de publicación, país, tipo de estudio
-    \\item \\textbf{Características metodológicas:} diseño, población/muestra, intervención evaluada
-    \\item \\textbf{Resultados principales:} métricas, outcomes, hallazgos clave
-    \\item \\textbf{Limitaciones reportadas:} sesgos, restricciones del estudio
-\\end{itemize}
-
-La extracción fue realizada por [número] revisores de forma independiente, resolviéndose las discrepancias mediante consenso o consulta a un tercer evaluador.
-
-\\subsection{Evaluación de calidad metodológica (RQS)}
-
-Para garantizar la rigurosidad de los estudios incluidos, se aplicó una evaluación de calidad utilizando un esquema de \\textbf{Research Quality Score (RQS)}. Este instrumento permite valorar dimensiones críticas como:
+Data extraction was carried out using a structured form specifically designed to capture relevant information from the included studies. The extracted data comprised:
 
 \\begin{itemize}
-    \\item Claridad en los objetivos y diseño del estudio
-    \\item Adecuación de la metodología empleada
-    \\item Transparencia en el reporte de resultados
-    \\item Consideración de limitaciones y sesgos potenciales
-    \\item Relevancia y aplicabilidad de las conclusiones
+    \\item \\textbf{General characteristics:} author(s), publication year, country, study type
+    \\item \\textbf{Methodological characteristics:} design, population/sample, evaluated intervention
+    \\item \\textbf{Main results:} metrics, outcomes, key findings
+    \\item \\textbf{Reported limitations:} biases, study restrictions
 \\end{itemize}
 
-Los estudios se clasificaron en categorías de calidad (alta, moderada, baja) según su puntuación RQS total, lo cual permitió interpretar los hallazgos con mayor criticidad y contexto.
+The extraction was performed independently by [number] reviewers, resolving discrepancies through consensus or consultation with a third evaluator.
 
-\\subsection{Diagrama de flujo PRISMA}
+\\subsection{Methodological Quality Assessment (RQS)}
 
-El proceso completo de búsqueda, cribado y selección de estudios se resume en el diagrama de flujo PRISMA presentado en la Figura~\\ref{fig:prisma} (Sección 3 - Resultados). Este diagrama ilustra de forma visual las etapas de identificación, cribado y elegibilidad, así como las razones específicas de exclusión en cada fase del proceso de revisión.`;
+To guarantee the thoroughness of the included studies, a quality assessment was applied using a \\textbf{Research Quality Score (RQS)} schema. This instrument allows evaluating critical dimensions such as:
+
+\\begin{itemize}
+    \\item Clarity in the study's objectives and design
+    \\item Adequacy of the applied methodology
+    \\item Transparency in the reporting of results
+    \\item Consideration of limitations and potential biases
+    \\item Relevance and applicability of the conclusions
+\\end{itemize}
+
+The studies were classified into quality categories (high, moderate, low) based on their total RQS score, allowing findings to be interpreted with greater context and criticality.
+
+\\subsection{PRISMA Flow Diagram}
+
+The complete search, screening, and selection process for studies is summarized in the PRISMA flow diagram presented in Figure~\\ref{fig:prisma} (Section 3 - Results). This visual diagram illustrates the identification, screening, and eligibility stages, as well as the specific reasons for exclusion at each phase of the review process.`;
 }
 
 
@@ -372,21 +373,21 @@ El proceso completo de búsqueda, cribado y selección de estudios se resume en 
  * Genera sección de Results con PRISMA diagram y subsecciones 3.1-3.3
  * El gráfico de codo (elbow) debe estar en Methods 2.4, no aquí
  */
-function generateResultsSection(resultsContent) {
+function generateResultsSection(resultsContent, format = 'ieee') {
   // Si hay contenido markdown personalizado, usarlo
   if (resultsContent && typeof resultsContent === 'string') {
-    let content = convertMarkdownToLatex(resultsContent);
+    let content = convertMarkdownToLatex(resultsContent, format);
     
     // Si no menciona PRISMA diagram, agregarlo al inicio
     if (!content.toLowerCase().includes('prisma') && !content.includes('figure')) {
-      content = `\\subsection{Diagrama de flujo PRISMA}
+      content = `\\subsection{PRISMA Flow Diagram}
 
-El proceso completo de identificación, cribado y selección de estudios se resume en el diagrama de flujo de la Figura~\\ref{fig:prisma}, elaborado conforme a las directrices PRISMA 2020.
+The complete process for identification, screening, and study selection is summarized in the flow diagram in Figure~\\ref{fig:prisma}, elaborated following the PRISMA 2020 guidelines.
 
 \\begin{figure*}[!htbp]
 \\centering
 \\includegraphics[width=0.9\\textwidth]{prisma_diagram}
-\\caption{Diagrama de flujo PRISMA 2020 del proceso de revisión sistemática. Muestra las fases de identificación, cribado, elegibilidad e inclusión final, así como las razones específicas de exclusión en cada etapa.}
+\\caption{PRISMA 2020 flow diagram of the systematic review process. Reveals the phases of identification, screening, eligibility, and final inclusion, along with the specific exclusive reasoning for each stage.}
 \\label{fig:prisma}
 \\end{figure*}
 
@@ -399,52 +400,45 @@ El proceso completo de identificación, cribado y selección de estudios se resu
   // Estructura por defecto con subsecciones 3.1-3.3 según estructura académica
   return `
 % PRISMA DIAGRAM al inicio de Resultados  
-\\subsection{Diagrama de flujo PRISMA}
+\\subsection{PRISMA Flow Diagram}
 
-El proceso completo de identificación, cribado y selección de estudios se resume en el diagrama de flujo de la Figura~\\ref{fig:prisma}, elaborado conforme a las directrices PRISMA 2020.
+The complete process for identification, screening, and selection of studies is summarized in the flow diagram in Figure~\\ref{fig:prisma}, elaborated following the PRISMA 2020 guidelines.
 
 \\begin{figure*}[!htbp]
 \\centering
 \\includegraphics[width=0.9\\textwidth]{prisma_diagram}
-\\caption{Diagrama de flujo PRISMA 2020 del proceso de revisión sistemática. Muestra las fases de identificación, cribado, elegibilidad e inclusión final de estudios, con desglose detallado por base de datos académica y razones específicas de exclusión en cada etapa.}
+\\caption{PRISMA 2020 flow diagram summarizing the systematic review process. Outlines the phases of identification, screening, eligibility, and final inclusion of studies, sorted by academic database and including specific reasons for exclusion continuously.}
 \\label{fig:prisma}
 \\end{figure*}
 
-La búsqueda inicial identificó un total de [N] registros en las bases de datos consultadas, de los cuales [N] fueron eliminados por duplicación. Tras el cribado de [N] títulos y resúmenes, se seleccionaron [N] artículos para revisión de texto completo. Finalmente, [N] estudios cumplieron todos los criterios de inclusión y fueron incluidos en la síntesis cualitativa.
+The initial search identified a total of [N] records in the consulted databases, of which [N] were eliminated due to duplication. After title and abstract screening of [N] records, [N] articles were selected for full-text review. Ultimately, [N] studies met all inclusion criteria and were incorporated into qualitative synthesis.
 
-\\subsection{Caracterización general de los estudios}
+\\subsection{General Study Characteristics}
 
-Los [N] estudios incluidos fueron publicados entre [año] y [año], con una mayor concentración en los últimos [X] años, reflejando el interés creciente en el tema. En términos geográficos, la mayoría de los estudios provienen de [países/regiones principales].
+The [N] included studies were published between [year] and [year], presenting a higher concentration over the last [X] years, showcasing ascending interest natively. Geographically, a majority issue from [lead regions/countries].
 
-En cuanto al diseño metodológico, se observó que [X\\%] correspondieron a [tipo de estudio], [X\\%] a [tipo de estudio], y el resto a [otros diseños]. Las poblaciones estudiadas variaron desde [describe poblaciones].
+Regarding the methodological design, [X\\%] embodied [study type], [X\\%] as [study type], alongside [other designs]. The surveyed populations varied broadly from [describe population spectrums].
 
-La Tabla~\\ref{tab:caracteristicas} resume las características generales de los estudios incluidos.
+Table~\\ref{tab:caracteristicas} details the structural properties of these studies.
 
-% NOTA: Esta tabla debe ser generada automáticamente desde los datos RQS
-% Placeholder para la tabla de características
+\\subsection{Methodological Quality Assessment (RQS)}
 
-\\subsection{Análisis de calidad metodológica (RQS)}
+The evaluative screening using the RQS scale exposed that [X\\%] realized an uppermost score (> [threshold]), [X\\%] ranked moderately ([range]), whilst [X\\%] scaled poorly (< [threshold]).
 
-La evaluación de calidad metodológica mediante el esquema RQS reveló que [X\\%] de los estudios alcanzaron una puntuación alta (> [umbral]), [X\\%] una puntuación moderada ([rango]), y [X\\%] una puntuación baja (< [umbral]).
+Optimal achievements corresponded with [criteria], highlighting a distinct lack predominantly concerning [poor criteria], systematically due to [describe typical inadequacies].
 
-Los criterios con mayor cumplimiento fueron [criterios], mientras que las principales debilidades metodológicas se detectaron en [criterios con bajo cumplimiento], particularmente relacionadas con [describe deficiencias comunes].
+\\subsection{Synthesis of Key Findings}
 
-% NOTA: Esta tabla debe ser generada automáticamente desde los datos RQS
-% Placeholder para tabla de evaluación RQS
-
-\\subsection{Síntesis de resultados principales}
-
-El análisis narrativo de los estudios incluidos permitió identificar los siguientes hallazgos clave:
+Narrative alignment from included datasets unveiled primary contributions sequentially:
 
 \\begin{itemize}
-    \\item \\textbf{Hallazgo 1:} [Describe hallazgo principal]
-    \\item \\textbf{Hallazgo 2:} [Describe hallazgo principal]
-    \\item \\textbf{Hallazgo 3:} [Describe hallazgo principal]
+    \\item \\textbf{Finding 1:} [Characterize central deduction]
+    \\item \\textbf{Finding 2:} [Characterize central deduction]
+    \\item \\textbf{Finding 3:} [Characterize central deduction]
 \\end{itemize}
 
-Se observó que [describe tendencias, patrones o inconsistencias]. Las métricas más frecuentemente reportadas fueron [lista métricas], con valores que oscilaron entre [rangos].
+It manifested logically that [characterize trends, gaps or dissonances]. Generally observed metrics involved [list metrics], scoring amidst [ranges].
 
-% NOTA: Esta tabla debe ser generada automáticamente desde los datos RQS
 % Placeholder para tabla de síntesis de evidencia`;
 }
 
@@ -512,7 +506,7 @@ function generateBibliography(references) {
  * Procesa tablas markdown y las convierte a formato LaTeX académico profesional
  * Compatible con formato de dos columnas y estándares de journals Q1
  */
-function processMarkdownTables(text) {
+function processMarkdownTables(text, format = 'ieee') {
   if (!text) return text;
   
   // Detectar bloques de tabla markdown completos
@@ -571,34 +565,114 @@ function processMarkdownTables(text) {
       columnSpec = headers.map(() => `p{${colWidth}\\\\textwidth}`).join(' ');
     }
     
+    // Ajuste seguro de columnas con envoltura si es LNCS
+    let formattedColumnSpec = columnSpec;
+    if (format === 'lncs') {
+      formattedColumnSpec = columnSpec.split(' ').map(col => {
+        // Reemplazar la especificación de p{...} por una versión segura >{\raggedright...}p{...}
+        if (col.startsWith('p{')) {
+          return `>{\\raggedright\\arraybackslash\\hspace{0pt}}${col}`;
+        }
+        return col;
+      }).join(' ');
+      // Aplicar \LTleft=0pt y \LTright=0pt al inicio de columnSpec para abarcar ancho en longtable
+      formattedColumnSpec = `@{\\extracolsep{\\fill}} ${formattedColumnSpec} @{}`;
+    }
+    
     // Generar label y caption
     const tableCaption = generateTableCaption(headers);
     const tableLabel = tableCaption.includes('Bases de datos') ? 'tab:busqueda' : `tab:table${tableCounter}`;
     
-    // Construir tabla LaTeX con formato correcto (doble columna / spans si necesario)
-    let latexTable = '\n\\begin{table*}[!htbp]\n';
-    latexTable += '\\centering\n';
-    latexTable += '\\renewcommand{\\arraystretch}{1.3}\n';
-    latexTable += `\\caption{${tableCaption}}\n`;
-    latexTable += `\\label{${tableLabel}}\n`;
-    latexTable += `\\begin{tabular}{${columnSpec}}\n`;
-    latexTable += '\\toprule\n';
+    const isHighDensity = numCols > 5;
+    const isVeryLong = dataRows.length > 20;
     
-    // Headers en negrita
-    latexTable += '\\textbf{' + headers.map(h => escapeLatexTableCell(h)).join('} & \\textbf{') + '} \\\\\n';
-    latexTable += '\\midrule\n';
+    let latexTable = '\\vspace{0.3cm}\n';
     
-    // Data rows con \midrule entre filas (pero NO después de la última)
-    dataRows.forEach((row, index) => {
-      latexTable += row.map(cell => escapeLatexTableCell(cell)).join(' & ') + ' \\\\\n';
-      if (index < dataRows.length - 1) {
+    if (format === 'lncs') {
+      // Modo seguro LNCS (Strict Compliance)
+      latexTable += '{\n'; // Block para contener cambios temporales de estilo
+      latexTable += '\\setlength{\\tabcolsep}{3pt}\n';
+      latexTable += '\\setlength{\\LTleft}{0pt}\n';
+      latexTable += '\\setlength{\\LTright}{0pt}\n';
+      
+      if (isVeryLong || isHighDensity) {
+        // Usar longtable explícito
+        latexTable += '\\begin{longtable}{' + formattedColumnSpec + '}\n';
+        latexTable += '\\caption{' + tableCaption + '} \\label{' + tableLabel + '} \\\\\n';
+        latexTable += '\\toprule\n';
+        latexTable += '\\textbf{' + headers.map(h => escapeLatexTableCell(h)).join('} & \\textbf{') + '} \\\\\n';
         latexTable += '\\midrule\n';
+        latexTable += '\\endfirsthead\n';
+        
+        latexTable += '\\multicolumn{' + numCols + '}{c} {{\\bfseries \\tablename\\ \\thetable{} -- continued from previous page}} \\\\\n';
+        latexTable += '\\toprule\n';
+        latexTable += '\\textbf{' + headers.map(h => escapeLatexTableCell(h)).join('} & \\textbf{') + '} \\\\\n';
+        latexTable += '\\midrule\n';
+        latexTable += '\\endhead\n';
+        
+        latexTable += '\\midrule\n';
+        latexTable += '\\multicolumn{' + numCols + '}{r}{{Continued on next page}} \\\\\n';
+        latexTable += '\\endfoot\n';
+        
+        latexTable += '\\bottomrule\n';
+        latexTable += '\\endlastfoot\n';
+        
+        dataRows.forEach((row, index) => {
+          latexTable += row.map(cell => escapeLatexTableCell(cell)).join(' & ') + ' \\\\\n';
+          if (index < dataRows.length - 1) {
+             latexTable += '\\midrule\n';
+          }
+        });
+        latexTable += '\\end{longtable}\n';
+      } else {
+        // Tabla normal corta
+        latexTable += '\\begin{table}[!htbp]\n';
+        latexTable += '\\centering\n';
+        latexTable += `\\caption{${tableCaption}}\n`;
+        latexTable += `\\label{${tableLabel}}\n`;
+        latexTable += `\\begin{tabular*}{\\textwidth}{${formattedColumnSpec}}\n`;
+        latexTable += '\\toprule\n';
+        latexTable += '\\textbf{' + headers.map(h => escapeLatexTableCell(h)).join('} & \\textbf{') + '} \\\\\n';
+        latexTable += '\\midrule\n';
+        
+        dataRows.forEach((row, index) => {
+          latexTable += row.map(cell => escapeLatexTableCell(cell)).join(' & ') + ' \\\\\n';
+          if (index < dataRows.length - 1) {
+             latexTable += '\\midrule\n';
+          }
+        });
+        latexTable += '\\bottomrule\n';
+        latexTable += '\\end{tabular*}\n';
+        latexTable += '\\end{table}\n';
       }
-    });
-    
-    latexTable += '\\bottomrule\n';
-    latexTable += '\\end{tabular}\n';
-    latexTable += '\\end{table*}\n\n';
+      latexTable += '}\n\\vspace{0.3cm}\n';
+      
+    } else {
+      // Formato IEEE/Elsevier legacy
+      const envName = isHighDensity ? 'sidewaystable*' : 'table*';
+  
+      latexTable += `\n\\begin{${envName}}[!htbp]\n`;
+      latexTable += '\\centering\n';
+      latexTable += '\\renewcommand{\\arraystretch}{1.3}\n';
+      latexTable += `\\caption{${tableCaption}}\n`;
+      latexTable += `\\label{${tableLabel}}\n`;
+      latexTable += `\\begin{tabular}{${columnSpec}}\n`;
+      latexTable += '\\toprule\n';
+      
+      latexTable += '\\textbf{' + headers.map(h => escapeLatexTableCell(h)).join('} & \\textbf{') + '} \\\\\n';
+      latexTable += '\\midrule\n';
+      
+      dataRows.forEach((row, index) => {
+        latexTable += row.map(cell => escapeLatexTableCell(cell)).join(' & ') + ' \\\\\n';
+        if (index < dataRows.length - 1) {
+          latexTable += '\\midrule\n';
+        }
+      });
+      
+      latexTable += '\\bottomrule\n';
+      latexTable += '\\end{tabular}\n';
+      latexTable += `\\end{${envName}}\n\n`;
+    }
     
     return latexTable;
   });
@@ -638,7 +712,7 @@ function generateTableCaption(headers) {
 /**
  * Convierte Markdown a LaTeX
  */
-function convertMarkdownToLatex(markdown) {
+function convertMarkdownToLatex(markdown, format = 'ieee') {
   if (!markdown) return '';
 
   let latex = markdown;
@@ -703,7 +777,7 @@ function convertMarkdownToLatex(markdown) {
     
     // Procesar tablas y restaurarlas (sin escapar)
     tables.forEach((table, i) => {
-      const processedTable = processMarkdownTables(table);
+      const processedTable = processMarkdownTables(table, format);
       latex = latex.replace(`\\TABLEPLACEHOLDER${i}`, processedTable);
     });
   } else {
@@ -769,6 +843,7 @@ function generateSpringer(articleData) {
   return `\\documentclass[smallextended]{svjour3}
 \\usepackage{graphicx}
 \\usepackage{hyperref}
+\\usepackage{rotating}
 
 \\begin{document}
 
@@ -789,11 +864,11 @@ ${escapeLatex(articleData.abstract || '')}
 \\keywords{${generateKeywords(articleData.keywords || [])}}
 \\end{abstract}
 
-${convertMarkdownToLatex(articleData.introduction || '')}
-${convertMarkdownToLatex(articleData.methods || '')}
-${convertMarkdownToLatex(articleData.results || '')}
-${convertMarkdownToLatex(articleData.discussion || '')}
-${convertMarkdownToLatex(articleData.conclusions || '')}
+${convertMarkdownToLatex(articleData.introduction || '', 'lncs')}
+${convertMarkdownToLatex(articleData.methods || '', 'lncs')}
+${convertMarkdownToLatex(articleData.results || '', 'lncs')}
+${convertMarkdownToLatex(articleData.discussion || '', 'lncs')}
+${convertMarkdownToLatex(articleData.conclusions || '', 'lncs')}
 
 \\begin{thebibliography}{${(articleData.references || []).length}}
 ${generateBibliography(articleData.references || [])}
@@ -837,11 +912,11 @@ ${generateKeywords(articleData.keywords || [])}
 
 \\linenumbers
 
-${convertMarkdownToLatex(articleData.introduction || '')}
-${convertMarkdownToLatex(articleData.methods || '')}
-${convertMarkdownToLatex(articleData.results || '')}
-${convertMarkdownToLatex(articleData.discussion || '')}
-${convertMarkdownToLatex(articleData.conclusions || '')}
+${convertMarkdownToLatex(articleData.introduction || '', 'elsevier')}
+${convertMarkdownToLatex(articleData.methods || '', 'elsevier')}
+${convertMarkdownToLatex(articleData.results || '', 'elsevier')}
+${convertMarkdownToLatex(articleData.discussion || '', 'elsevier')}
+${convertMarkdownToLatex(articleData.conclusions || '', 'elsevier')}
 
 \\section*{References}
 \\begin{thebibliography}{${(articleData.references || []).length}}
@@ -851,8 +926,74 @@ ${generateBibliography(articleData.references || [])}
 \\end{document}`;
 }
 
+/**
+ * Genera proyecto multi-archivo para Springer LNCS
+ */
+function generateSpringerProject(articleData, userProfile = null) {
+  const defaultAuthor = userProfile ? {
+    name: userProfile.fullName || 'Author Name',
+    email: userProfile.email || 'email@espe.edu.ec',
+    institution: 'Universidad de las Fuerzas Armadas ESPE',
+    department: 'Departamento de Ciencias de la Computación',
+    city: 'Sangolquí',
+    country: 'Ecuador'
+  } : null;
+
+  const authorsList = articleData.authors || (defaultAuthor ? [defaultAuthor] : []);
+  const authorNames = authorsList.map(a => escapeLatex(a.name)).join(' \\and ');
+  const instituteInfos = authorsList.map(a => 
+    `${escapeLatex(a.institution || 'Institution')}, ${escapeLatex(a.city || '')}, ${escapeLatex(a.country || '')}\\\\\\email{${escapeLatex(a.email || 'email@email.com')}}`
+  ).join(' \\and\n');
+
+  const mainTex = `\\documentclass[runningheads]{llncs}
+
+\\usepackage[utf8]{inputenc}
+\\usepackage{graphicx}
+\\usepackage{hyperref}
+\\usepackage{rotating}
+\\usepackage{booktabs}
+\\usepackage{longtable}
+\\usepackage{array}
+
+\\begin{document}
+
+\\title{${escapeLatex(articleData.title || 'Systematic Literature Review')}}
+\\author{${authorNames}}
+\\institute{${instituteInfos}}
+
+\\maketitle
+
+\\input{sections/00_abstract.tex}
+\\input{sections/01_introduction.tex}
+\\input{sections/02_methodology.tex}
+\\input{sections/03_results.tex}
+\\input{sections/04_discussion.tex}
+\\input{sections/05_conclusions.tex}
+
+\\bibliographystyle{splncs04}
+\\bibliography{references}
+
+\\end{document}`;
+
+  const abstractTex = `\\begin{abstract}
+${escapeLatex(articleData.abstract || '')}
+\\keywords{${generateKeywords(articleData.keywords || [])}}
+\\end{abstract}`;
+
+  return {
+    'main.tex': mainTex,
+    'sections/00_abstract.tex': abstractTex,
+    'sections/01_introduction.tex': convertMarkdownToLatex(articleData.introduction || '', 'lncs'),
+    'sections/02_methodology.tex': generateMethodsSection(articleData.methods || '', true, 'lncs'),
+    'sections/03_results.tex': generateResultsSection(articleData.results || '', 'lncs'),
+    'sections/04_discussion.tex': convertMarkdownToLatex(articleData.discussion || '', 'lncs'),
+    'sections/05_conclusions.tex': convertMarkdownToLatex(articleData.conclusions || '', 'lncs')
+  };
+}
+
 module.exports = {
   generate,
+  generateSpringerProject,
   generateSpringer,
   generateElsevier,
   convertMarkdownToLatex,

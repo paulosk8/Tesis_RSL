@@ -18,7 +18,8 @@ import { Badge } from "@/components/ui/badge"
 import { CheckCircle2, Circle, AlertCircle } from "lucide-react"
 import { apiClient } from "@/lib/api-client"
 import { Skeleton } from "@/components/ui/skeleton"
-
+import { Button } from "@/components/ui/button"
+import Link from "next/link"
 interface PrismaItem {
   id: string
   project_id: string
@@ -270,9 +271,14 @@ export function PrismaPreviewDialog({ projectId, open, onOpenChange }: PrismaPre
                     <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
                       Progreso del Checklist
                     </p>
-                    <p className="text-xs text-blue-800 dark:text-blue-200 mt-1">
+                    <p className="text-xs text-blue-800 dark:text-blue-200 mt-1 mb-3">
                       Completa los ítems faltantes para cumplir con las directrices PRISMA 2020.
                     </p>
+                    <Button size="sm" asChild>
+                      <Link href={`/projects/${projectId}/prisma`}>
+                        Ir al Editor PRISMA
+                      </Link>
+                    </Button>
                   </div>
                 </div>
               )}
